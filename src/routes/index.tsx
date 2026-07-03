@@ -1054,6 +1054,50 @@ function PhysicalConfirmed({ onFinish }: { onFinish: () => void }) {
 const mInput =
   "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#00b4d8]";
 
+function DobInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  // value is ISO YYYY-MM-DD (or empty)
+  const [y, m, d] = value ? value.split("-") : ["", "", ""];
+  const emit = (dd: string, mm: string, yyyy: string) => {
+    if (dd.length === 2 && mm.length === 2 && yyyy.length === 4) {
+      onChange(`${yyyy}-${mm}-${dd}`);
+    } else {
+      onChange("");
+    }
+  };
+  const numeric = (s: string, max: number) => s.replace(/\D/g, "").slice(0, max);
+  return (
+    <div className="flex gap-2">
+      <input
+        inputMode="numeric"
+        placeholder="DD"
+        aria-label="Day"
+        className={`${mInput} text-center`}
+        value={d ?? ""}
+        maxLength={2}
+        onChange={(e) => emit(numeric(e.target.value, 2), m ?? "", y ?? "")}
+      />
+      <input
+        inputMode="numeric"
+        placeholder="MM"
+        aria-label="Month"
+        className={`${mInput} text-center`}
+        value={m ?? ""}
+        maxLength={2}
+        onChange={(e) => emit(d ?? "", numeric(e.target.value, 2), y ?? "")}
+      />
+      <input
+        inputMode="numeric"
+        placeholder="YYYY"
+        aria-label="Year"
+        className={`${mInput} text-center`}
+        value={y ?? ""}
+        maxLength={4}
+        onChange={(e) => emit(d ?? "", m ?? "", numeric(e.target.value, 4))}
+      />
+    </div>
+  );
+}
+
 function MobileField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
