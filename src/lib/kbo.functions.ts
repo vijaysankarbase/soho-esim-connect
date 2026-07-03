@@ -34,10 +34,15 @@ export type KboLookupResult = {
 };
 
 function redact(xml: string): string {
-  return xml.replace(
-    /(<[^>]*Password[^>]*>)([^<]+)(<\/[^>]*Password>)/gi,
-    "$1[REDACTED_DIGEST]$3",
-  );
+  return xml
+    .replace(
+      /(<[^>]*Username[^>]*>)([^<]+)(<\/[^>]*Username>)/gi,
+      "$1[REDACTED_USERNAME]$3",
+    )
+    .replace(
+      /(<[^>]*Password[^>]*>)([^<]+)(<\/[^>]*Password>)/gi,
+      "$1[REDACTED_DIGEST]$3",
+    );
 }
 
 function normalizeEnterprise(nr: string): string {
