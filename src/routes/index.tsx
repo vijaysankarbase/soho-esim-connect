@@ -212,7 +212,7 @@ function SohoPoc() {
               <PlansScreen
                 selected={selectedPlanId}
                 onSelect={setSelectedPlanId}
-                onNext={() => go("sim-select")}
+                onNext={() => go(esimCompatible ? "esim-compatible" : "sim-select")}
               />
             )}
             {screen === "sim-select" && (
