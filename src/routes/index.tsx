@@ -277,7 +277,7 @@ function SohoPoc() {
                 plan={selectedPlan}
                 kbo={kbo!}
                 itsmeName={itsmeName}
-                onFinish={restart}
+                onFinish={() => go("esim-pin")}
               />
             )}
             {screen === "physical-order" && (
@@ -287,6 +287,19 @@ function SohoPoc() {
               />
             )}
             {screen === "physical-confirmed" && <PhysicalConfirmed onFinish={restart} />}
+            {screen === "esim-pin" && (
+              <EsimPinScreen onActivate={() => go("esim-os-prompt")} />
+            )}
+            {screen === "esim-os-prompt" && (
+              <EsimOsPromptScreen
+                onAllow={() => go("esim-installing")}
+                onDeny={() => go("esim-pin")}
+              />
+            )}
+            {screen === "esim-installing" && (
+              <EsimInstallingScreen onDone={() => setScreen("esim-activated")} />
+            )}
+            {screen === "esim-activated" && <EsimActivatedScreen onFinish={restart} />}
           </div>
         </PhoneFrame>
 
