@@ -591,23 +591,23 @@ function EsimCompatibleScreen({
     <div className="flex h-full flex-col px-5 py-6">
       <div className="flex-1 overflow-y-auto">
         <div className="flex flex-col items-center text-center">
-          <div className="grid h-20 w-20 place-items-center rounded-full bg-cyan-50">
-            <CheckCircle2 className="h-12 w-12 text-[#00b4d8]" strokeWidth={1.5} />
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-cyan-50">
+            <CheckCircle2 className="h-10 w-10 text-[#00b4d8]" strokeWidth={1.5} />
           </div>
-          <h1 className="mt-5 font-display text-2xl font-semibold text-slate-900">
+          <h1 className="mt-4 font-display text-2xl font-semibold text-slate-900">
             Your phone is eSIM compatible
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             You're all set for a digital SIM. Activate your SOHO line in minutes.
           </p>
         </div>
-        <div className="mt-6 space-y-3">
+        <div className="mt-4 space-y-2">
           {benefits.map((b) => {
             const Icon = b.icon;
             return (
               <div
                 key={b.text}
-                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3"
+                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-2.5"
               >
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-50 text-[#00b4d8]">
                   <Icon className="h-5 w-5" />
