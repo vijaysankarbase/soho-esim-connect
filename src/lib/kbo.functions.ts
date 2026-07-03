@@ -29,9 +29,18 @@ export type KboLookupResult = {
   address?: string;
   functions: KboFunction[];
   source: "live" | "mock";
-  raw?: string; // sanitized snippet for POC display
+  endpoint?: string;
+  requestXml?: string; // sanitized (password digest redacted)
+  responseXml?: string; // truncated
   error?: string;
 };
+
+function redact(xml: string): string {
+  return xml.replace(
+    /(<wsse:Password[^>]*>)([^<]+)(<\/wsse:Password>)/i,
+    "$1[REDACTED_DIGEST]$3",
+  );
+}
 
 function normalizeEnterprise(nr: string): string {
   return nr.replace(/[^0-9]/g, "");
