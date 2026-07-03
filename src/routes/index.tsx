@@ -1296,11 +1296,3 @@ function EsimActivatedScreen({ onFinish }: { onFinish: () => void }) {
     </div>
   );
 }
-
-// tiny local shim so we don't need to add another top-level import
-function useEffectShim(effect: () => void | (() => void), deps: unknown[]) {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const React = require("react");
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  React.useEffect(effect, deps);
-}
