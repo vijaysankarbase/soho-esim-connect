@@ -346,8 +346,6 @@ function DebugPanel(props: {
   setEsimCompatible: (v: boolean) => void;
   itsmeName: string;
   setItsmeName: (v: string) => void;
-  enterpriseNumber: string;
-  setEnterpriseNumber: (v: string) => void;
 }) {
   return (
     <div className="mb-6 rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur">
@@ -355,7 +353,7 @@ function DebugPanel(props: {
         <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
         POC Inputs
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-sm text-white">
           <span>eSIM compatible</span>
           <button
@@ -382,20 +380,10 @@ function DebugPanel(props: {
             placeholder="Jan Peeters"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm text-white">
-          <span className="text-xs text-white/60">Enterprise nr.</span>
-          <input
-            className="h-9 rounded-lg bg-white/10 px-3 font-mono text-sm text-white outline-none placeholder:text-white/40 focus:bg-white/15"
-            value={props.enterpriseNumber}
-            onChange={(e) => props.setEnterpriseNumber(e.target.value)}
-            placeholder="0203.201.340"
-          />
-        </label>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-white/50">
-        Live KBO Public Search WS (acceptance). Try <span className="font-mono">0473.416.418</span>{" "}
-        (Telenet). The itsme name is compared against the company's authorised representatives
-        returned by KBO.
+        Live KBO Public Search WS (acceptance). The enterprise number is entered in the phone flow.
+        The itsme name is compared against the company's authorised representatives returned by KBO.
       </p>
     </div>
   );
