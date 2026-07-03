@@ -262,7 +262,12 @@ function SohoPoc() {
             )}
             {screen === "itsme-loading" && <ItsmeLoading />}
             {screen === "itsme-consent" && (
-              <ItsmeConsent name={itsmeName} onApprove={runKbo} onCancel={back} />
+              <ItsmeConsent
+                firstName={itsmeFirstName}
+                lastName={itsmeLastName}
+                onApprove={runKbo}
+                onCancel={back}
+              />
             )}
             {screen === "kbo-loading" && <KboLoading />}
             {screen === "kbo-error" && <KboErrorScreen kbo={kbo!} onRestart={restart} />}
