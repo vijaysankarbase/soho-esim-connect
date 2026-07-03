@@ -174,7 +174,7 @@ function SohoPoc() {
         companyName: "",
         status: "unknown",
         functions: [],
-        source: "mock",
+        source: "error",
         error: e instanceof Error ? e.message : String(e),
       });
       setScreen("match-fail");
@@ -393,10 +393,9 @@ function DebugPanel(props: {
         </label>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-white/50">
-        Tip: end enterprise nr. with <span className="font-mono">0000</span> to force an inactive
-        company. Set itsme name to <span className="font-mono">Jan Peeters</span>,{" "}
-        <span className="font-mono">Marie Dubois</span> or{" "}
-        <span className="font-mono">Sophie Van den Berg</span> to match the mock KBO functions.
+        Live KBO Public Search WS (acceptance). Try <span className="font-mono">0473.416.418</span>{" "}
+        (Telenet). The itsme name is compared against the company's authorised representatives
+        returned by KBO.
       </p>
     </div>
   );
@@ -878,7 +877,7 @@ function MatchSuccessScreen({
         <Row2 k="KBO nr." v={kbo.enterpriseNumber} />
         <Row2 k="Status" v="Active" />
         {plan && <Row2 k="Plan" v={`${plan.name} — €${plan.price}/mo`} />}
-        <Row2 k="Data source" v={kbo.source === "live" ? "KBO live" : "KBO mock (fallback)"} />
+        <Row2 k="Data source" v={kbo.source === "live" ? "KBO live" : "KBO error"} />
       </div>
       <div className="mt-auto">
         <PrimaryButton onClick={onFinish}>Activate my eSIM</PrimaryButton>

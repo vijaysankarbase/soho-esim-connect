@@ -3,18 +3,14 @@ import { createServerFn } from "@tanstack/react-start";
 /**
  * KBO / BCE Public Search Web Service — SOAP + WS-Security UsernameToken.
  *
- * POC notes:
- *  - Test endpoint per Smals cookbook (ECB Public Search WS, test env).
- *  - Auth = WS-Security UsernameToken with PasswordDigest, Nonce, Created.
- *  - PasswordDigest = Base64( SHA1( nonceBytes + createdBytes + passwordBytes ) )
- *  - Credentials read from env inside handler (never at module scope).
- *  - If the KBO test endpoint is unreachable from this sandbox, we fall back
- *    to a deterministic mock so the UI flow stays demonstrable.
+ * Uses Smals-issued credentials against the acceptance (test) endpoint:
+ *   https://kbopub-acc.economie.fgov.be/kbopubws210000/services/wsKBOPub
+ *
+ * Overridable via KBO_WS_ENDPOINT env var.
+ *
+ * Auth: WS-Security UsernameToken with PasswordDigest, Nonce, Created.
+ *   PasswordDigest = Base64( SHA1( nonceBytes + createdBytes + passwordBytes ) )
  */
-
-const KBO_ENDPOINT =
-  process.env.KBO_WS_ENDPOINT ??
-  "https://kbopub.economie.fgov.be/kbo-open-data/services/ws";
 
 export type KboFunction = {
   role: string;
@@ -26,10 +22,12 @@ export type KboLookupResult = {
   enterpriseNumber: string;
   companyName: string;
   status: "active" | "inactive" | "unknown";
+  statusRaw?: string;
   address?: string;
   functions: KboFunction[];
-  source: "live" | "mock";
+  source: "live" | "error";
   endpoint?: string;
+  httpStatus?: number;
   requestXml?: string; // sanitized (password digest redacted)
   responseXml?: string; // truncated
   error?: string;
@@ -37,7 +35,7 @@ export type KboLookupResult = {
 
 function redact(xml: string): string {
   return xml.replace(
-    /(<wsse:Password[^>]*>)([^<]+)(<\/wsse:Password>)/i,
+    /(<[^>]*Password[^>]*>)([^<]+)(<\/[^>]*Password>)/gi,
     "$1[REDACTED_DIGEST]$3",
   );
 }
@@ -46,18 +44,26 @@ function normalizeEnterprise(nr: string): string {
   return nr.replace(/[^0-9]/g, "");
 }
 
+function formatBceNumber(nr: string): string {
+  // KBO expects the enterprise number as "NNNN.NNN.NNN" in many operations,
+  // but the WS accepts both dotted and undotted. We send undotted for stability.
+  return nr;
+}
+
 function buildEnvelope(opts: {
   username: string;
   passwordDigest: string;
   nonceB64: string;
   created: string;
   enterpriseNumber: string;
+  language: string;
 }): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                  xmlns:ws="http://economie.fgov.be/kbopub/webservices/v1">
+                  xmlns:v1="http://economie.fgov.be/kbopub/webservices/v1">
   <soapenv:Header>
-    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+    <wsse:Security soapenv:mustUnderstand="1"
+                   xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
                    xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
       <wsse:UsernameToken>
         <wsse:Username>${opts.username}</wsse:Username>
@@ -68,9 +74,10 @@ function buildEnvelope(opts: {
     </wsse:Security>
   </soapenv:Header>
   <soapenv:Body>
-    <ws:ReadEnterpriseRequest>
-      <ws:EnterpriseNumber>${opts.enterpriseNumber}</ws:EnterpriseNumber>
-    </ws:ReadEnterpriseRequest>
+    <v1:ReadEnterpriseRequest>
+      <v1:EnterpriseNumber>${opts.enterpriseNumber}</v1:EnterpriseNumber>
+      <v1:Language>${opts.language}</v1:Language>
+    </v1:ReadEnterpriseRequest>
   </soapenv:Body>
 </soapenv:Envelope>`;
 }
@@ -91,54 +98,46 @@ function bytesToB64(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes));
 }
 
-function parseResponse(xml: string, enterpriseNumber: string): KboLookupResult {
-  const nameMatch =
-    xml.match(/<[^>]*Denomination[^>]*>([^<]+)<\/[^>]*Denomination>/i) ??
-    xml.match(/<[^>]*Name[^>]*>([^<]+)<\/[^>]*Name>/i);
-  const statusMatch = xml.match(/<[^>]*Status[^>]*>([^<]+)<\/[^>]*Status>/i);
-  const status = statusMatch?.[1]?.toLowerCase().includes("act") ? "active" : "inactive";
-  const functions: KboFunction[] = [];
-  const fnRegex = /<[^>]*Function[^>]*>([\s\S]*?)<\/[^>]*Function>/gi;
+/** Grab first matching tag content, ignoring namespaces. */
+function firstTag(xml: string, localName: string): string | undefined {
+  const re = new RegExp(`<(?:[a-zA-Z0-9]+:)?${localName}\\b[^>]*>([\\s\\S]*?)<\\/(?:[a-zA-Z0-9]+:)?${localName}>`, "i");
+  const m = xml.match(re);
+  return m?.[1]?.trim();
+}
+
+function classifyStatus(raw?: string): "active" | "inactive" | "unknown" {
+  if (!raw) return "unknown";
+  const s = raw.toLowerCase();
+  // Smals status codes: "AC" active, "ST" stopped, others = inactive
+  if (s === "ac" || s.includes("actief") || s.includes("actif") || s.includes("active")) return "active";
+  if (s === "st" || s.includes("stopgezet") || s.includes("arrêt") || s.includes("arret") || s.includes("stopped") || s.includes("cessé") || s.includes("cesse")) return "inactive";
+  return "unknown";
+}
+
+function parseFunctions(xml: string): KboFunction[] {
+  const out: KboFunction[] = [];
+  const fnRegex = /<(?:[a-zA-Z0-9]+:)?Function\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Function>/gi;
   let m: RegExpExecArray | null;
   while ((m = fnRegex.exec(xml))) {
     const block = m[1];
-    const role = block.match(/<[^>]*Role[^>]*>([^<]+)</i)?.[1] ?? "Function";
-    const first = block.match(/<[^>]*FirstName[^>]*>([^<]+)</i)?.[1] ?? "";
-    const last = block.match(/<[^>]*LastName[^>]*>([^<]+)</i)?.[1] ?? "";
-    if (first || last) functions.push({ role, firstName: first, lastName: last });
+    const role =
+      firstTag(block, "FunctionDescription") ??
+      firstTag(block, "Role") ??
+      firstTag(block, "Description") ??
+      "Function";
+    const first = firstTag(block, "FirstName") ?? firstTag(block, "GivenName") ?? "";
+    const last = firstTag(block, "LastName") ?? firstTag(block, "FamilyName") ?? firstTag(block, "Name") ?? "";
+    if (first || last) out.push({ role, firstName: first, lastName: last });
   }
-  return {
-    enterpriseNumber,
-    companyName: nameMatch?.[1] ?? "Unknown company",
-    status,
-    functions,
-    source: "live",
-  };
+  return out;
 }
 
-function parseResponseWithMeta(xml: string, enterpriseNumber: string, requestXml: string): KboLookupResult {
-  const base = parseResponse(xml, enterpriseNumber);
-  return { ...base, endpoint: KBO_ENDPOINT, requestXml: redact(requestXml), responseXml: xml.slice(0, 4000) };
-}
-
-function mockResult(enterpriseNumber: string, reason: string, requestXml?: string): KboLookupResult {
-  const clean = normalizeEnterprise(enterpriseNumber);
-  const inactive = clean.endsWith("0000");
-  return {
-    enterpriseNumber: clean,
-    companyName: "NIMBUS COFFEE BVBA",
-    status: inactive ? "inactive" : "active",
-    address: "Rue de la Loi 16, 1000 Bruxelles",
-    functions: [
-      { role: "Zaakvoerder", firstName: "Jan", lastName: "Peeters" },
-      { role: "Bestuurder", firstName: "Marie", lastName: "Dubois" },
-      { role: "Gedelegeerd bestuurder", firstName: "Sophie", lastName: "Van den Berg" },
-    ],
-    source: "mock",
-    endpoint: KBO_ENDPOINT,
-    requestXml: requestXml ? redact(requestXml) : undefined,
-    error: reason,
-  };
+function parseSoapFault(xml: string): string | undefined {
+  const fault =
+    firstTag(xml, "faultstring") ??
+    firstTag(xml, "Reason") ??
+    firstTag(xml, "Text");
+  return fault;
 }
 
 export const lookupEnterprise = createServerFn({ method: "POST" })
@@ -146,6 +145,9 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
     enterpriseNumber: String(d.enterpriseNumber ?? "").trim(),
   }))
   .handler(async ({ data }): Promise<KboLookupResult> => {
+    const endpoint =
+      process.env.KBO_WS_ENDPOINT ??
+      "https://kbopub-acc.economie.fgov.be/kbopubws210000/services/wsKBOPub";
     const nr = normalizeEnterprise(data.enterpriseNumber);
     if (nr.length < 9) {
       return {
@@ -153,7 +155,8 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
         companyName: "",
         status: "unknown",
         functions: [],
-        source: "mock",
+        source: "error",
+        endpoint,
         error: "Enterprise number must be at least 9 digits.",
       };
     }
@@ -161,7 +164,16 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
     const username = process.env.KBO_WS_USERNAME;
     const password = process.env.KBO_WS_PASSWORD;
     if (!username || !password) {
-      return mockResult(nr, "KBO credentials not configured — using mock data.");
+      return {
+        enterpriseNumber: nr,
+        companyName: "",
+        status: "unknown",
+        functions: [],
+        source: "error",
+        endpoint,
+        error:
+          "KBO credentials not configured. Set KBO_WS_USERNAME and KBO_WS_PASSWORD.",
+      };
     }
 
     const nonce = crypto.getRandomValues(new Uint8Array(16));
@@ -174,12 +186,13 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
         passwordDigest,
         nonceB64: bytesToB64(nonce),
         created,
-        enterpriseNumber: nr,
+        enterpriseNumber: formatBceNumber(nr),
+        language: "fr",
       });
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(KBO_ENDPOINT, {
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "text/xml; charset=utf-8",
@@ -190,12 +203,84 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
       }).finally(() => clearTimeout(timeout));
 
       const text = await res.text();
+
       if (!res.ok) {
-        return mockResult(nr, `KBO HTTP ${res.status} — falling back to mock. ${text.slice(0, 200)}`, envelope);
+        const fault = parseSoapFault(text);
+        return {
+          enterpriseNumber: nr,
+          companyName: "",
+          status: "unknown",
+          functions: [],
+          source: "error",
+          endpoint,
+          httpStatus: res.status,
+          requestXml: redact(envelope),
+          responseXml: text.slice(0, 4000),
+          error: `KBO HTTP ${res.status}${fault ? ` — ${fault}` : ""}`,
+        };
       }
-      return parseResponseWithMeta(text, nr, envelope);
+
+      const fault = parseSoapFault(text);
+      if (fault) {
+        return {
+          enterpriseNumber: nr,
+          companyName: "",
+          status: "unknown",
+          functions: [],
+          source: "error",
+          endpoint,
+          httpStatus: res.status,
+          requestXml: redact(envelope),
+          responseXml: text.slice(0, 4000),
+          error: `KBO SOAP fault: ${fault}`,
+        };
+      }
+
+      const name =
+        firstTag(text, "Denomination") ??
+        firstTag(text, "EnterpriseName") ??
+        firstTag(text, "Name") ??
+        "";
+      const statusRaw =
+        firstTag(text, "StatusCode") ??
+        firstTag(text, "Status") ??
+        firstTag(text, "EnterpriseStatus");
+      const status = classifyStatus(statusRaw);
+      const composedAddress =
+        [
+          firstTag(text, "Street"),
+          firstTag(text, "HouseNumber"),
+          firstTag(text, "ZipCode"),
+          firstTag(text, "Municipality"),
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined;
+      const address = firstTag(text, "FormattedAddress") ?? composedAddress;
+
+      return {
+        enterpriseNumber: nr,
+        companyName: name || "Unknown company",
+        status,
+        statusRaw,
+        address,
+        functions: parseFunctions(text),
+        source: "live",
+        endpoint,
+        httpStatus: res.status,
+        requestXml: redact(envelope),
+        responseXml: text.slice(0, 4000),
+      };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return mockResult(nr, `KBO call failed (${msg}) — falling back to mock.`, envelope);
+      return {
+        enterpriseNumber: nr,
+        companyName: "",
+        status: "unknown",
+        functions: [],
+        source: "error",
+        endpoint,
+        requestXml: envelope ? redact(envelope) : undefined,
+        error: `KBO call failed: ${msg}`,
+      };
     }
   });
