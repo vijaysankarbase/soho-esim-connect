@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
  * KBO / BCE Public Search Web Service — SOAP + WS-Security UsernameToken.
  *
  * Uses Smals-issued credentials against the acceptance (test) endpoint:
- *   https://kbopub-acc.economie.fgov.be/kbopubws210000/services/wsKBOPub
+ *   https://kbopub-acc.economie.fgov.be/kbopubws180000/services/wsKBOPub
  *
  * Overridable via KBO_WS_ENDPOINT env var.
  *
@@ -55,16 +55,23 @@ function buildEnvelope(opts: {
   passwordDigest: string;
   nonceB64: string;
   created: string;
+  expires: string;
+  requestId: string;
   enterpriseNumber: string;
   language: string;
 }): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                  xmlns:v1="http://economie.fgov.be/kbopub/webservices/v1">
+                  xmlns:mes="http://economie.fgov.be/kbopub/webservices/v1/messages"
+                  xmlns:dat="http://economie.fgov.be/kbopub/webservices/v1/datamodel">
   <soapenv:Header>
     <wsse:Security soapenv:mustUnderstand="1"
                    xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
                    xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+      <wsu:Timestamp>
+        <wsu:Created>${opts.created}</wsu:Created>
+        <wsu:Expires>${opts.expires}</wsu:Expires>
+      </wsu:Timestamp>
       <wsse:UsernameToken>
         <wsse:Username>${opts.username}</wsse:Username>
         <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">${opts.passwordDigest}</wsse:Password>
@@ -72,12 +79,15 @@ function buildEnvelope(opts: {
         <wsu:Created>${opts.created}</wsu:Created>
       </wsse:UsernameToken>
     </wsse:Security>
+    <mes:RequestContext>
+      <mes:Id>${opts.requestId}</mes:Id>
+      <mes:Language>${opts.language}</mes:Language>
+    </mes:RequestContext>
   </soapenv:Header>
   <soapenv:Body>
-    <v1:ReadEnterpriseRequest>
-      <v1:EnterpriseNumber>${opts.enterpriseNumber}</v1:EnterpriseNumber>
-      <v1:Language>${opts.language}</v1:Language>
-    </v1:ReadEnterpriseRequest>
+    <mes:ReadEnterpriseRequest>
+      <dat:EnterpriseNumber>${opts.enterpriseNumber}</dat:EnterpriseNumber>
+    </mes:ReadEnterpriseRequest>
   </soapenv:Body>
 </soapenv:Envelope>`;
 }
@@ -96,6 +106,12 @@ async function computeDigest(nonce: Uint8Array, created: string, password: strin
 
 function bytesToB64(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes));
+}
+
+function makeRequestId() {
+  return typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 /** Grab first matching tag content, ignoring namespaces. */
@@ -147,7 +163,7 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<KboLookupResult> => {
     const endpoint =
       process.env.KBO_WS_ENDPOINT ??
-      "https://kbopub-acc.economie.fgov.be/kbopubws210000/services/wsKBOPub";
+      "https://kbopub-acc.economie.fgov.be/kbopubws180000/services/wsKBOPub";
     const nr = normalizeEnterprise(data.enterpriseNumber);
     if (nr.length < 9) {
       return {
@@ -177,7 +193,9 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
     }
 
     const nonce = crypto.getRandomValues(new Uint8Array(16));
-    const created = new Date().toISOString();
+    const now = new Date();
+    const created = now.toISOString();
+    const expires = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
     let envelope = "";
     try {
       const passwordDigest = await computeDigest(nonce, created, password);
@@ -186,6 +204,8 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
         passwordDigest,
         nonceB64: bytesToB64(nonce),
         created,
+        expires,
+        requestId: makeRequestId(),
         enterpriseNumber: formatBceNumber(nr),
         language: "fr",
       });
@@ -196,7 +216,7 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
         method: "POST",
         headers: {
           "Content-Type": "text/xml; charset=utf-8",
-          SOAPAction: "\"ReadEnterprise\"",
+          SOAPAction: "\"http://fgov.economie.be/kbopub/ReadEnterprise\"",
         },
         body: envelope,
         signal: controller.signal,

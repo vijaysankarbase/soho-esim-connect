@@ -1,11 +1,11 @@
 <!--
   KBO / BCE Public Search — ReadEnterpriseRequest SOAP template.
 
-  Endpoint (production example):
-    POST https://kbopub.economie.fgov.be/kbo-open-data/services/ws
+  Endpoint (acceptance):
+    POST https://kbopub-acc.economie.fgov.be/kbopubws180000/services/wsKBOPub
   Headers:
     Content-Type: text/xml; charset=utf-8
-    SOAPAction: "ReadEnterprise"
+    SOAPAction: "http://fgov.economie.be/kbopub/ReadEnterprise"
 
   Auth: WS-Security UsernameToken (NOT HTTP Basic).
     PasswordDigest = Base64( SHA1( nonceBytes || createdBytes || passwordBytes ) )
@@ -17,10 +17,15 @@
       status = ACTIVE. Otherwise stop and show "Company is not active".
 -->
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                  xmlns:ws="http://economie.fgov.be/kbopub/webservices/v1">
+                  xmlns:mes="http://economie.fgov.be/kbopub/webservices/v1/messages"
+                  xmlns:dat="http://economie.fgov.be/kbopub/webservices/v1/datamodel">
   <soapenv:Header>
     <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
                    xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+      <wsu:Timestamp>
+        <wsu:Created>{{UTC_ISO_8601}}</wsu:Created>
+        <wsu:Expires>{{UTC_ISO_8601_PLUS_5_MIN}}</wsu:Expires>
+      </wsu:Timestamp>
       <wsse:UsernameToken>
         <wsse:Username>wsot5739</wsse:Username>
         <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">
@@ -32,10 +37,14 @@
         <wsu:Created>{{UTC_ISO_8601}}</wsu:Created>
       </wsse:UsernameToken>
     </wsse:Security>
+    <mes:RequestContext>
+      <mes:Id>{{UUID}}</mes:Id>
+      <mes:Language>fr</mes:Language>
+    </mes:RequestContext>
   </soapenv:Header>
   <soapenv:Body>
-    <ws:ReadEnterpriseRequest>
-      <ws:EnterpriseNumber>0203201340</ws:EnterpriseNumber>
-    </ws:ReadEnterpriseRequest>
+    <mes:ReadEnterpriseRequest>
+      <dat:EnterpriseNumber>0203201340</dat:EnterpriseNumber>
+    </mes:ReadEnterpriseRequest>
   </soapenv:Body>
 </soapenv:Envelope>

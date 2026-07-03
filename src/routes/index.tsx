@@ -91,6 +91,7 @@ type Screen =
   | "itsme-loading"
   | "itsme-consent"
   | "kbo-loading"
+  | "kbo-error"
   | "kbo-not-active"
   | "match-fail"
   | "match-success"
@@ -162,6 +163,10 @@ function SohoPoc() {
     try {
       const result = await lookupFn({ data: { enterpriseNumber } });
       setKbo(result);
+      if (result.source === "error" || result.status === "unknown") {
+        setScreen("kbo-error");
+        return;
+      }
       if (result.status !== "active") {
         setScreen("kbo-not-active");
         return;
@@ -235,6 +240,7 @@ function SohoPoc() {
               <ItsmeConsent name={itsmeName} onApprove={runKbo} onCancel={back} />
             )}
             {screen === "kbo-loading" && <KboLoading />}
+            {screen === "kbo-error" && <KboErrorScreen kbo={kbo!} onRestart={restart} />}
             {screen === "kbo-not-active" && <KboNotActive kbo={kbo!} onRestart={restart} />}
             {screen === "match-fail" && (
               <MatchFailScreen
@@ -780,6 +786,29 @@ function KboNotActive({ kbo, onRestart }: { kbo: KboLookupResult; onRestart: () 
         <p className="mt-2 text-sm text-slate-500">
           According to KBO, <span className="font-medium">{kbo.companyName || kbo.enterpriseNumber}</span>{" "}
           is not in an active state. We can't open a SOHO line for it.
+        </p>
+      </div>
+      <div className="w-full">
+        <PrimaryButton onClick={onRestart}>Back to start</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function KboErrorScreen({ kbo, onRestart }: { kbo: KboLookupResult; onRestart: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between px-6 py-8 text-center">
+      <div />
+      <div className="flex flex-col items-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-amber-50">
+          <ShieldCheck className="h-14 w-14 text-amber-500" strokeWidth={1.5} />
+        </div>
+        <h1 className="mt-6 font-display text-2xl font-semibold text-slate-900">
+          KBO lookup failed
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          We couldn't verify <span className="font-medium">{kbo.enterpriseNumber}</span> with KBO right now.
+          Please try again later.
         </p>
       </div>
       <div className="w-full">
