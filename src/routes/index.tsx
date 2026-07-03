@@ -174,7 +174,7 @@ function SohoPoc() {
         companyName: "",
         status: "unknown",
         functions: [],
-        source: "mock",
+        source: "error",
         error: e instanceof Error ? e.message : String(e),
       });
       setScreen("match-fail");

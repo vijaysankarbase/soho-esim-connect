@@ -246,8 +246,7 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
         firstTag(text, "Status") ??
         firstTag(text, "EnterpriseStatus");
       const status = classifyStatus(statusRaw);
-      const address =
-        firstTag(text, "FormattedAddress") ??
+      const composedAddress =
         [
           firstTag(text, "Street"),
           firstTag(text, "HouseNumber"),
@@ -256,6 +255,7 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
         ]
           .filter(Boolean)
           .join(" ") || undefined;
+      const address = firstTag(text, "FormattedAddress") ?? composedAddress;
 
       return {
         enterpriseNumber: nr,
