@@ -103,7 +103,11 @@ type Screen =
   | "match-fail"
   | "match-success"
   | "physical-order"
-  | "physical-confirmed";
+  | "physical-confirmed"
+  | "esim-pin"
+  | "esim-os-prompt"
+  | "esim-installing"
+  | "esim-activated";
 
 /* ============================================================ */
 
