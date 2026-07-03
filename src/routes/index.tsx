@@ -1044,3 +1044,24 @@ function PrimaryButton({
     </button>
   );
 }
+
+function SecondaryButton({
+  children,
+  onClick,
+  icon,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:bg-slate-50"
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
