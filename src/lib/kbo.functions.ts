@@ -29,9 +29,18 @@ export type KboLookupResult = {
   address?: string;
   functions: KboFunction[];
   source: "live" | "mock";
-  raw?: string; // sanitized snippet for POC display
+  endpoint?: string;
+  requestXml?: string; // sanitized (password digest redacted)
+  responseXml?: string; // truncated
   error?: string;
 };
+
+function redact(xml: string): string {
+  return xml.replace(
+    /(<wsse:Password[^>]*>)([^<]+)(<\/wsse:Password>)/i,
+    "$1[REDACTED_DIGEST]$3",
+  );
+}
 
 function normalizeEnterprise(nr: string): string {
   return nr.replace(/[^0-9]/g, "");
@@ -104,14 +113,17 @@ function parseResponse(xml: string, enterpriseNumber: string): KboLookupResult {
     status,
     functions,
     source: "live",
-    raw: xml.slice(0, 1200),
   };
 }
 
-function mockResult(enterpriseNumber: string, reason: string): KboLookupResult {
-  // Deterministic mock keyed off the enterprise number for demo predictability.
+function parseResponseWithMeta(xml: string, enterpriseNumber: string, requestXml: string): KboLookupResult {
+  const base = parseResponse(xml, enterpriseNumber);
+  return { ...base, endpoint: KBO_ENDPOINT, requestXml: redact(requestXml), responseXml: xml.slice(0, 4000) };
+}
+
+function mockResult(enterpriseNumber: string, reason: string, requestXml?: string): KboLookupResult {
   const clean = normalizeEnterprise(enterpriseNumber);
-  const inactive = clean.endsWith("0000"); // easy way to test the "not active" branch
+  const inactive = clean.endsWith("0000");
   return {
     enterpriseNumber: clean,
     companyName: "NIMBUS COFFEE BVBA",
@@ -123,6 +135,8 @@ function mockResult(enterpriseNumber: string, reason: string): KboLookupResult {
       { role: "Gedelegeerd bestuurder", firstName: "Sophie", lastName: "Van den Berg" },
     ],
     source: "mock",
+    endpoint: KBO_ENDPOINT,
+    requestXml: requestXml ? redact(requestXml) : undefined,
     error: reason,
   };
 }
@@ -150,11 +164,12 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
       return mockResult(nr, "KBO credentials not configured — using mock data.");
     }
 
+    const nonce = crypto.getRandomValues(new Uint8Array(16));
+    const created = new Date().toISOString();
+    let envelope = "";
     try {
-      const nonce = crypto.getRandomValues(new Uint8Array(16));
-      const created = new Date().toISOString();
       const passwordDigest = await computeDigest(nonce, created, password);
-      const envelope = buildEnvelope({
+      envelope = buildEnvelope({
         username,
         passwordDigest,
         nonceB64: bytesToB64(nonce),
@@ -176,11 +191,11 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
 
       const text = await res.text();
       if (!res.ok) {
-        return mockResult(nr, `KBO HTTP ${res.status} — falling back to mock. ${text.slice(0, 200)}`);
+        return mockResult(nr, `KBO HTTP ${res.status} — falling back to mock. ${text.slice(0, 200)}`, envelope);
       }
-      return parseResponse(text, nr);
+      return parseResponseWithMeta(text, nr, envelope);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return mockResult(nr, `KBO call failed (${msg}) — falling back to mock.`);
+      return mockResult(nr, `KBO call failed (${msg}) — falling back to mock.`, envelope);
     }
   });

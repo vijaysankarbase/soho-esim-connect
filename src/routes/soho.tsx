@@ -266,6 +266,10 @@ function SohoPoc() {
           </div>
         </PhoneFrame>
 
+        {kbo && (kbo.requestXml || kbo.responseXml || kbo.error) && (
+          <KboDebug kbo={kbo} />
+        )}
+
         <p className="mt-6 text-center text-xs text-white/50">
           POC · My BASE inspired flow · KBO ({kbo?.source ?? "not called"})
         </p>
@@ -273,6 +277,67 @@ function SohoPoc() {
     </div>
   );
 }
+
+function KboDebug({ kbo }: { kbo: KboLookupResult }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-6 rounded-2xl border border-white/15 bg-white/5 backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-cyan-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+          Last KBO round-trip
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] normal-case tracking-normal ${
+              kbo.source === "live" ? "bg-emerald-400/20 text-emerald-200" : "bg-amber-400/20 text-amber-200"
+            }`}
+          >
+            {kbo.source}
+          </span>
+        </span>
+        <span className="text-xs text-white/50">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-white/10 p-4 text-xs text-white/80">
+          {kbo.endpoint && (
+            <div>
+              <div className="mb-1 text-white/50">Endpoint</div>
+              <code className="block break-all rounded bg-black/40 p-2 font-mono text-[11px] text-cyan-200">
+                POST {kbo.endpoint}
+              </code>
+            </div>
+          )}
+          {kbo.error && (
+            <div>
+              <div className="mb-1 text-white/50">Note</div>
+              <div className="rounded bg-amber-500/10 p-2 text-[11px] text-amber-200">{kbo.error}</div>
+            </div>
+          )}
+          {kbo.requestXml && (
+            <details open>
+              <summary className="cursor-pointer text-white/60">Request SOAP envelope (password digest redacted)</summary>
+              <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-white/80">
+                {kbo.requestXml}
+              </pre>
+            </details>
+          )}
+          {kbo.responseXml && (
+            <details>
+              <summary className="cursor-pointer text-white/60">Response SOAP (truncated)</summary>
+              <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-white/80">
+                {kbo.responseXml}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 /* ==================== Building blocks ==================== */
 
