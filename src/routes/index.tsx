@@ -842,16 +842,8 @@ function MatchFailScreen({
           representative of{" "}
           <span className="font-medium">{kbo?.companyName || "this company"}</span>.
         </p>
-        {kbo && kbo.functions.length > 0 && (
-          <div className="mt-4 w-full rounded-xl bg-slate-50 p-3 text-left text-xs text-slate-600">
-            <div className="mb-1 font-medium text-slate-700">KBO registered persons</div>
-            {kbo.functions.slice(0, 4).map((f, i) => (
-              <div key={i}>
-                • {f.firstName} {f.lastName} — {f.role}
-              </div>
-            ))}
-          </div>
-        )}
+
+
       </div>
       <div className="w-full space-y-2">
         <PrimaryButton onClick={onPhysical}>Order a physical SIM instead</PrimaryButton>
