@@ -21,7 +21,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lookupEnterprise, type KboLookupResult } from "@/lib/kbo.functions";
 import { matchIdentity } from "@/lib/name-match";
 
