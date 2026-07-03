@@ -164,11 +164,12 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
       return mockResult(nr, "KBO credentials not configured — using mock data.");
     }
 
+    const nonce = crypto.getRandomValues(new Uint8Array(16));
+    const created = new Date().toISOString();
+    let envelope = "";
     try {
-      const nonce = crypto.getRandomValues(new Uint8Array(16));
-      const created = new Date().toISOString();
       const passwordDigest = await computeDigest(nonce, created, password);
-      const envelope = buildEnvelope({
+      envelope = buildEnvelope({
         username,
         passwordDigest,
         nonceB64: bytesToB64(nonce),
@@ -190,11 +191,11 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
 
       const text = await res.text();
       if (!res.ok) {
-        return mockResult(nr, `KBO HTTP ${res.status} — falling back to mock. ${text.slice(0, 200)}`);
+        return mockResult(nr, `KBO HTTP ${res.status} — falling back to mock. ${text.slice(0, 200)}`, envelope);
       }
-      return parseResponse(text, nr);
+      return parseResponseWithMeta(text, nr, envelope);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return mockResult(nr, `KBO call failed (${msg}) — falling back to mock.`);
+      return mockResult(nr, `KBO call failed (${msg}) — falling back to mock.`, envelope);
     }
   });
