@@ -209,9 +209,12 @@ function SohoPoc() {
           <DebugPanel
             esimCompatible={esimCompatible}
             setEsimCompatible={setEsimCompatible}
-            itsmeName={itsmeName}
-            setItsmeName={setItsmeName}
+            itsmeFirstName={itsmeFirstName}
+            setItsmeFirstName={setItsmeFirstName}
+            itsmeLastName={itsmeLastName}
+            setItsmeLastName={setItsmeLastName}
           />
+
         )}
 
         {/* Phone mockup */}
