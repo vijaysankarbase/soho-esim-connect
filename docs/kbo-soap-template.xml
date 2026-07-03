@@ -1,8 +1,8 @@
 <!--
   KBO / BCE Public Search — ReadEnterpriseRequest SOAP template.
 
-  Endpoint (acceptance):
-    POST https://kbopub-acc.economie.fgov.be/kbopubws180000/services/wsKBOPub
+  Endpoint:
+    POST https://kbopub.economie.fgov.be/kbopubws180000/services/wsKBOPub
   Headers:
     Content-Type: text/xml; charset=utf-8
     SOAPAction: "http://fgov.economie.be/kbopub/ReadEnterprise"
