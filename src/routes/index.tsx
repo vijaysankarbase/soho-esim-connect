@@ -184,7 +184,7 @@ function SohoPoc() {
   /* ==================== Render ==================== */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001a3d] via-[#002a5c] to-[#003a7d] py-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#001f2e] via-[#004a5c] to-[#00a9c7] py-8">
       <div className="mx-auto max-w-xl px-4">
         {/* Debug input panel — only on first screen */}
         {screen === "plans" && (
