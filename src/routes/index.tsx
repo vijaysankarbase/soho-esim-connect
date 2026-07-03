@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Globe,
   Loader2,
   Package,
   ShieldCheck,
@@ -13,6 +14,7 @@ import {
   Smartphone,
   Truck,
   X,
+  Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { lookupEnterprise, type KboLookupResult } from "@/lib/kbo.functions";
