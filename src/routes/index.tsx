@@ -1056,14 +1056,14 @@ const mInput =
 
 function DobInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   // value is ISO YYYY-MM-DD (or empty). Keep local partial state so users can type freely.
-  const initial = React.useMemo(() => {
+  const initial = useMemo(() => {
     if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       const [yy, mm, dd] = value.split("-");
       return { d: dd, m: mm, y: yy };
     }
     return { d: "", m: "", y: "" };
   }, [value]);
-  const [parts, setParts] = React.useState(initial);
+  const [parts, setParts] = useState(initial);
   const numeric = (s: string, max: number) => s.replace(/\D/g, "").slice(0, max);
   const update = (next: { d: string; m: string; y: string }) => {
     setParts(next);
