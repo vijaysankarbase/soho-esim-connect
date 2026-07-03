@@ -1,0 +1,41 @@
+<!--
+  KBO / BCE Public Search — ReadEnterpriseRequest SOAP template.
+
+  Endpoint (production example):
+    POST https://kbopub.economie.fgov.be/kbo-open-data/services/ws
+  Headers:
+    Content-Type: text/xml; charset=utf-8
+    SOAPAction: "ReadEnterprise"
+
+  Auth: WS-Security UsernameToken (NOT HTTP Basic).
+    PasswordDigest = Base64( SHA1( nonceBytes || createdBytes || passwordBytes ) )
+    Nonce           = Base64( 16 random bytes )
+    Created         = UTC ISO-8601 timestamp (e.g. 2026-07-03T09:41:12.345Z)
+
+  Business rule for the SOHO eSIM POC:
+    - Only proceed to Function matching if the response reports
+      status = ACTIVE. Otherwise stop and show "Company is not active".
+-->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:ws="http://economie.fgov.be/kbopub/webservices/v1">
+  <soapenv:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+                   xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
+      <wsse:UsernameToken>
+        <wsse:Username>wsot5739</wsse:Username>
+        <wsse:Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">
+          {{BASE64_SHA1_OF_NONCE_PLUS_CREATED_PLUS_PASSWORD}}
+        </wsse:Password>
+        <wsse:Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary">
+          {{BASE64_16_RANDOM_BYTES}}
+        </wsse:Nonce>
+        <wsu:Created>{{UTC_ISO_8601}}</wsu:Created>
+      </wsse:UsernameToken>
+    </wsse:Security>
+  </soapenv:Header>
+  <soapenv:Body>
+    <ws:ReadEnterpriseRequest>
+      <ws:EnterpriseNumber>0203201340</ws:EnterpriseNumber>
+    </ws:ReadEnterpriseRequest>
+  </soapenv:Body>
+</soapenv:Envelope>
