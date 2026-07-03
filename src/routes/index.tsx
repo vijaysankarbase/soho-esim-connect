@@ -193,8 +193,6 @@ function SohoPoc() {
             setEsimCompatible={setEsimCompatible}
             itsmeName={itsmeName}
             setItsmeName={setItsmeName}
-            enterpriseNumber={enterpriseNumber}
-            setEnterpriseNumber={setEnterpriseNumber}
           />
         )}
 
