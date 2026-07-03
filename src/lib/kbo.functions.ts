@@ -14,7 +14,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 const KBO_ENDPOINT =
   process.env.KBO_WS_ENDPOINT ??
-  "https://ondernemingsloketws-acc.smals.be/ondernemingsloket-ws/services/ondernemingsloketPublicSearch";
+  "https://kbopub.economie.fgov.be/kbo-open-data/services/ws";
 
 export type KboFunction = {
   role: string;
