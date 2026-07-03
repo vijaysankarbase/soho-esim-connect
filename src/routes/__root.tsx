@@ -91,6 +91,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SOHO eSIM Onboarding POC · My BASE" },
+      { name: "description", content: "SOHO eSIM Connect simplifies eSIM onboarding for small businesses." },
+      { property: "og:description", content: "SOHO eSIM Connect simplifies eSIM onboarding for small businesses." },
+      { name: "twitter:description", content: "SOHO eSIM Connect simplifies eSIM onboarding for small businesses." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/66334bb7-c4f1-4826-81b4-14668b3c3980/id-preview-a596f455--2024e1f7-c6e6-4c35-ae73-ed07c1db4492.lovable.app-1783082354191.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/66334bb7-c4f1-4826-81b4-14668b3c3980/id-preview-a596f455--2024e1f7-c6e6-4c35-ae73-ed07c1db4492.lovable.app-1783082354191.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
