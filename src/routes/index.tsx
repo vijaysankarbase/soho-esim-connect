@@ -1217,11 +1217,7 @@ function EsimInstallingScreen({ onDone }: { onDone: () => void }) {
     "Activating your line…",
   ];
   const [step, setStep] = useState(0);
-  useMemo(() => {
-    // no-op; keep TS happy
-  }, []);
-  // sequential progress
-  useEffectShim(() => {
+  useEffect(() => {
     if (step >= steps.length) {
       const t = setTimeout(onDone, 500);
       return () => clearTimeout(t);
