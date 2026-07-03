@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Globe,
   Loader2,
   Package,
   ShieldCheck,
@@ -13,6 +14,7 @@ import {
   Smartphone,
   Truck,
   X,
+  Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { lookupEnterprise, type KboLookupResult } from "@/lib/kbo.functions";
@@ -210,14 +212,23 @@ function SohoPoc() {
               <PlansScreen
                 selected={selectedPlanId}
                 onSelect={setSelectedPlanId}
-                onNext={() => go("sim-select")}
+                onNext={() => go(esimCompatible ? "esim-compatible" : "sim-select")}
               />
             )}
             {screen === "sim-select" && (
               <SimSelectScreen esimCompatible={esimCompatible} onChoose={chooseSim} />
             )}
             {screen === "esim-compatible" && (
-              <EsimCompatibleScreen onNext={() => go("customer-info")} />
+              <EsimCompatibleScreen
+                onSelectEsim={() => {
+                  setSimType("esim");
+                  go("customer-info");
+                }}
+                onSelectPhysical={() => {
+                  setSimType("physical");
+                  go("physical-order");
+                }}
+              />
             )}
             {screen === "customer-info" && (
               <CustomerInfoScreen
@@ -562,24 +573,55 @@ function SimSelectScreen({
   );
 }
 
-function EsimCompatibleScreen({ onNext }: { onNext: () => void }) {
+function EsimCompatibleScreen({
+  onSelectEsim,
+  onSelectPhysical,
+}: {
+  onSelectEsim: () => void;
+  onSelectPhysical: () => void;
+}) {
+  const benefits = [
+    { icon: Zap, text: "Instant activation — no waiting for delivery" },
+    { icon: Globe, text: "Switch plans or add lines digitally" },
+    { icon: Smartphone, text: "Use multiple numbers on one device" },
+  ];
+
   return (
-    <div className="flex h-full flex-col items-center justify-between px-6 py-8 text-center">
-      <div />
-      <div className="flex flex-col items-center">
-        <div className="grid h-24 w-24 place-items-center rounded-full bg-cyan-50">
-          <CheckCircle2 className="h-14 w-14 text-[#00b4d8]" strokeWidth={1.5} />
+    <div className="flex h-full flex-col px-5 py-6">
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col items-center text-center">
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-cyan-50">
+            <CheckCircle2 className="h-10 w-10 text-[#00b4d8]" strokeWidth={1.5} />
+          </div>
+          <h1 className="mt-4 font-display text-2xl font-semibold text-slate-900">
+            Your phone is eSIM compatible
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            You're all set for a digital SIM. Activate your SOHO line in minutes.
+          </p>
         </div>
-        <h1 className="mt-6 font-display text-2xl font-semibold text-slate-900">
-          Your phone is eSIM compatible
-        </h1>
-        <p className="mt-2 text-sm text-slate-500">
-          We can activate your BASE SOHO line straight to this device. Next, we'll verify your
-          identity and your company.
-        </p>
+        <div className="mt-5 space-y-2">
+          {benefits.map((b) => {
+            const Icon = b.icon;
+            return (
+              <div
+                key={b.text}
+                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3"
+              >
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-50 text-[#00b4d8]">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-sm font-medium text-slate-700">{b.text}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <div className="w-full">
-        <PrimaryButton onClick={onNext}>Continue</PrimaryButton>
+      <div className="space-y-3 border-t border-slate-100 bg-white pt-4">
+        <PrimaryButton onClick={onSelectEsim}>Select eSIM</PrimaryButton>
+        <SecondaryButton onClick={onSelectPhysical} icon={<Package className="h-4 w-4" />}>
+          Select physical SIM
+        </SecondaryButton>
       </div>
     </div>
   );
@@ -998,6 +1040,27 @@ function PrimaryButton({
     >
       {children}
       <ArrowRight className="h-4 w-4" />
+    </button>
+  );
+}
+
+function SecondaryButton({
+  children,
+  onClick,
+  icon,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:bg-slate-50"
+    >
+      {icon}
+      {children}
     </button>
   );
 }
