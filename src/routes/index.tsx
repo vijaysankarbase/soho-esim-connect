@@ -3,20 +3,25 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
   ArrowRight,
+  Battery,
   Check,
   CheckCircle2,
   ChevronRight,
+  Copy,
+  Download,
   Globe,
+  KeyRound,
   Loader2,
   Package,
   ShieldCheck,
   Signal,
   Smartphone,
   Truck,
+  Wifi,
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { lookupEnterprise, type KboLookupResult } from "@/lib/kbo.functions";
 import { matchIdentity } from "@/lib/name-match";
 
@@ -98,7 +103,11 @@ type Screen =
   | "match-fail"
   | "match-success"
   | "physical-order"
-  | "physical-confirmed";
+  | "physical-confirmed"
+  | "esim-pin"
+  | "esim-os-prompt"
+  | "esim-installing"
+  | "esim-activated";
 
 /* ============================================================ */
 
@@ -268,7 +277,7 @@ function SohoPoc() {
                 plan={selectedPlan}
                 kbo={kbo!}
                 itsmeName={itsmeName}
-                onFinish={restart}
+                onFinish={() => go("esim-pin")}
               />
             )}
             {screen === "physical-order" && (
@@ -278,6 +287,19 @@ function SohoPoc() {
               />
             )}
             {screen === "physical-confirmed" && <PhysicalConfirmed onFinish={restart} />}
+            {screen === "esim-pin" && (
+              <EsimPinScreen onActivate={() => go("esim-os-prompt")} />
+            )}
+            {screen === "esim-os-prompt" && (
+              <EsimOsPromptScreen
+                onAllow={() => go("esim-installing")}
+                onDeny={() => go("esim-pin")}
+              />
+            )}
+            {screen === "esim-installing" && (
+              <EsimInstallingScreen onDone={() => setScreen("esim-activated")} />
+            )}
+            {screen === "esim-activated" && <EsimActivatedScreen onFinish={restart} />}
           </div>
         </PhoneFrame>
 
@@ -1062,5 +1084,215 @@ function SecondaryButton({
       {icon}
       {children}
     </button>
+  );
+}
+
+/* ==================== eSIM install simulation ==================== */
+
+function EsimPinScreen({ onActivate }: { onActivate: () => void }) {
+  const pin = "4829-7361-BASE-EU";
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(pin);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <div className="flex h-full flex-col px-6 py-8">
+      <div className="flex flex-col items-center text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#e0f7fb]">
+          <KeyRound className="h-8 w-8 text-[#00a9c7]" />
+        </div>
+        <h1 className="mt-5 font-display text-2xl font-semibold text-slate-900">
+          Your eSIM activation code
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Keep this code handy. Your device will use it to download your BASE eSIM profile.
+        </p>
+      </div>
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-500">
+          Activation PIN
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <code className="font-mono text-lg font-semibold tracking-wider text-slate-900">
+            {pin}
+          </code>
+          <button
+            type="button"
+            onClick={copy}
+            className="grid h-9 w-9 place-items-center rounded-full text-slate-500 hover:bg-white"
+            aria-label="Copy PIN"
+          >
+            <Copy className="h-4 w-4" />
+          </button>
+        </div>
+        {copied && (
+          <div className="mt-2 text-xs text-emerald-600">Copied to clipboard</div>
+        )}
+      </div>
+      <ul className="mt-5 space-y-2 text-xs text-slate-500">
+        <li>• Your line stays active on any current SIM until install completes.</li>
+        <li>• You can install the eSIM on one device at a time.</li>
+      </ul>
+      <div className="mt-auto">
+        <PrimaryButton onClick={onActivate}>Activate eSIM</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function EsimOsPromptScreen({ onAllow, onDeny }: { onAllow: () => void; onDeny: () => void }) {
+  return (
+    <div className="relative flex h-full flex-col bg-slate-100">
+      {/* Fake iOS status bar + settings backdrop */}
+      <div className="flex items-center justify-between px-6 pt-3 text-xs font-semibold text-slate-900">
+        <span>9:41</span>
+        <div className="flex items-center gap-1">
+          <Signal className="h-3 w-3" />
+          <Wifi className="h-3 w-3" />
+          <Battery className="h-3.5 w-3.5" />
+        </div>
+      </div>
+      <div className="px-6 pt-6">
+        <div className="text-[13px] text-slate-500">Settings</div>
+        <div className="mt-1 font-display text-2xl font-semibold text-slate-900">
+          Cellular
+        </div>
+      </div>
+      <div className="mx-6 mt-4 space-y-px overflow-hidden rounded-2xl bg-white text-sm text-slate-800">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span>Primary</span>
+          <span className="text-slate-400">Personal</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
+          <span className="text-slate-400">Add eSIM…</span>
+          <ChevronRight className="h-4 w-4 text-slate-300" />
+        </div>
+      </div>
+
+      {/* iOS-style dialog */}
+      <div className="absolute inset-0 flex items-end justify-center bg-black/40 px-4 pb-6">
+        <div className="w-full max-w-[300px] overflow-hidden rounded-2xl bg-white/95 backdrop-blur">
+          <div className="px-5 pb-3 pt-5 text-center">
+            <div className="font-display text-[15px] font-semibold text-slate-900">
+              "BASE" would like to install a Cellular Plan
+            </div>
+            <p className="mt-2 text-[12px] leading-snug text-slate-600">
+              This will download an eSIM profile from BASE onto this iPhone. You can manage it later in Settings › Cellular.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 border-t border-slate-200 text-[15px]">
+            <button
+              type="button"
+              onClick={onDeny}
+              className="border-r border-slate-200 py-3 font-medium text-[#007aff] hover:bg-slate-50"
+            >
+              Don't Allow
+            </button>
+            <button
+              type="button"
+              onClick={onAllow}
+              className="py-3 font-semibold text-[#007aff] hover:bg-slate-50"
+            >
+              Allow
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EsimInstallingScreen({ onDone }: { onDone: () => void }) {
+  const steps = [
+    "Contacting BASE provisioning server…",
+    "Downloading eSIM profile…",
+    "Installing on secure element…",
+    "Registering on the BASE network…",
+    "Activating your line…",
+  ];
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (step >= steps.length) {
+      const t = setTimeout(onDone, 500);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setStep((s) => s + 1), 900);
+    return () => clearTimeout(t);
+  }, [step]);
+  return (
+    <div className="flex h-full flex-col px-6 py-8">
+      <div className="flex flex-col items-center text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#e0f7fb]">
+          <Download className="h-8 w-8 text-[#00a9c7]" />
+        </div>
+        <h1 className="mt-5 font-display text-2xl font-semibold text-slate-900">
+          Installing your eSIM
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Keep this screen open. This usually takes less than a minute.
+        </p>
+      </div>
+      <div className="mt-6 space-y-3">
+        {steps.map((label, i) => {
+          const done = i < step;
+          const active = i === step;
+          return (
+            <div
+              key={label}
+              className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-sm ${
+                done
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+                  : active
+                    ? "border-[#00a9c7]/30 bg-[#e0f7fb] text-slate-900"
+                    : "border-slate-100 bg-white text-slate-400"
+              }`}
+            >
+              <span className="grid h-6 w-6 place-items-center">
+                {done ? (
+                  <Check className="h-4 w-4 text-emerald-600" />
+                ) : active ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-[#00a9c7]" />
+                ) : (
+                  <span className="h-2 w-2 rounded-full bg-slate-300" />
+                )}
+              </span>
+              <span>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function EsimActivatedScreen({ onFinish }: { onFinish: () => void }) {
+  return (
+    <div className="flex h-full flex-col px-6 py-8">
+      <div className="flex flex-col items-center text-center">
+        <div className="grid h-20 w-20 place-items-center rounded-full bg-green-50">
+          <CheckCircle2 className="h-12 w-12 text-green-600" strokeWidth={2} />
+        </div>
+        <h1 className="mt-5 font-display text-2xl font-semibold text-slate-900">
+          Your eSIM is active
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          You're now connected on the BASE network. Enjoy your new SOHO line.
+        </p>
+      </div>
+      <div className="mt-6 space-y-3 rounded-2xl bg-slate-50 p-4 text-sm">
+        <Row2 k="Network" v="BASE 5G" />
+        <Row2 k="Signal" v="Excellent" />
+        <Row2 k="Line status" v="Active" />
+      </div>
+      <div className="mt-auto">
+        <PrimaryButton onClick={onFinish}>Done</PrimaryButton>
+      </div>
+    </div>
   );
 }
