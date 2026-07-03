@@ -707,12 +707,7 @@ function CustomerInfoScreen({
           />
         </MobileField>
         <MobileField label="Date of birth">
-          <input
-            type="date"
-            className={mInput}
-            value={value.dob}
-            onChange={(e) => onChange({ ...value, dob: e.target.value })}
-          />
+          <DobInput value={value.dob} onChange={(dob) => onChange({ ...value, dob })} />
         </MobileField>
       </div>
       <div className="border-t border-slate-100 bg-white px-5 py-4">
