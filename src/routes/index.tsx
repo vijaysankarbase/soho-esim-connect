@@ -796,11 +796,13 @@ function ItsmeLoading() {
 }
 
 function ItsmeConsent({
-  name,
+  firstName,
+  lastName,
   onApprove,
   onCancel,
 }: {
-  name: string;
+  firstName: string;
+  lastName: string;
   onApprove: () => void;
   onCancel: () => void;
 }) {
@@ -815,7 +817,8 @@ function ItsmeConsent({
           BASE is asking you to confirm your identity to open a SOHO eSIM line.
         </p>
         <div className="mt-6 space-y-2 rounded-2xl bg-white/10 p-4 text-sm">
-          <Row k="Name" v={name} />
+          <Row k="First name" v={firstName || "—"} />
+          <Row k="Last name" v={lastName || "—"} />
           <Row k="Nationality" v="Belgian" />
           <Row k="Age verification" v="18+" />
         </div>
