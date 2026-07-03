@@ -3,8 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 /**
  * KBO / BCE Public Search Web Service — SOAP + WS-Security UsernameToken.
  *
- * Uses Smals-issued credentials against the acceptance (test) endpoint:
- *   https://kbopub-acc.economie.fgov.be/kbopubws180000/services/wsKBOPub
+ * Uses KBO-issued credentials against the configured Public Search endpoint:
+ *   https://kbopub.economie.fgov.be/kbopubws180000/services/wsKBOPub
  *
  * Overridable via KBO_WS_ENDPOINT env var.
  *
@@ -121,10 +121,15 @@ function firstTag(xml: string, localName: string): string | undefined {
   return m?.[1]?.trim();
 }
 
+function firstValueInBlock(xml: string, localName: string): string | undefined {
+  const block = firstTag(xml, localName);
+  return block ? firstTag(block, "Value") : undefined;
+}
+
 function classifyStatus(raw?: string): "active" | "inactive" | "unknown" {
   if (!raw) return "unknown";
   const s = raw.toLowerCase();
-  // Smals status codes: "AC" active, "ST" stopped, others = inactive
+  // KBO status codes: "AC" active, "ST" stopped, others = inactive.
   if (s === "ac" || s.includes("actief") || s.includes("actif") || s.includes("active")) return "active";
   if (s === "st" || s.includes("stopgezet") || s.includes("arrêt") || s.includes("arret") || s.includes("stopped") || s.includes("cessé") || s.includes("cesse")) return "inactive";
   return "unknown";
@@ -137,12 +142,13 @@ function parseFunctions(xml: string): KboFunction[] {
   while ((m = fnRegex.exec(xml))) {
     const block = m[1];
     const role =
+      firstValueInBlock(block, "Description") ??
       firstTag(block, "FunctionDescription") ??
       firstTag(block, "Role") ??
       firstTag(block, "Description") ??
       "Function";
     const first = firstTag(block, "FirstName") ?? firstTag(block, "GivenName") ?? "";
-    const last = firstTag(block, "LastName") ?? firstTag(block, "FamilyName") ?? firstTag(block, "Name") ?? "";
+    const last = firstTag(block, "LastName") ?? firstTag(block, "FamilyName") ?? firstTag(block, "Surname") ?? firstTag(block, "Name") ?? "";
     if (first || last) out.push({ role, firstName: first, lastName: last });
   }
   return out;
@@ -163,7 +169,7 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<KboLookupResult> => {
     const endpoint =
       process.env.KBO_WS_ENDPOINT ??
-      "https://kbopub-acc.economie.fgov.be/kbopubws180000/services/wsKBOPub";
+      "https://kbopub.economie.fgov.be/kbopubws180000/services/wsKBOPub";
     const nr = normalizeEnterprise(data.enterpriseNumber);
     if (nr.length < 9) {
       return {
@@ -257,21 +263,23 @@ export const lookupEnterprise = createServerFn({ method: "POST" })
       }
 
       const name =
-        firstTag(text, "Denomination") ??
+        firstValueInBlock(text, "Denomination") ??
         firstTag(text, "EnterpriseName") ??
         firstTag(text, "Name") ??
         "";
+      const statusBlock = firstTag(text, "Status");
       const statusRaw =
+        (statusBlock ? firstTag(statusBlock, "Code") : undefined) ??
+        (statusBlock ? firstValueInBlock(statusBlock, "Description") : undefined) ??
         firstTag(text, "StatusCode") ??
-        firstTag(text, "Status") ??
         firstTag(text, "EnterpriseStatus");
       const status = classifyStatus(statusRaw);
       const composedAddress =
         [
-          firstTag(text, "Street"),
+          firstValueInBlock(text, "Street"),
           firstTag(text, "HouseNumber"),
-          firstTag(text, "ZipCode"),
-          firstTag(text, "Municipality"),
+          firstTag(text, "Zipcode") ?? firstTag(text, "ZipCode"),
+          firstValueInBlock(text, "Municipality"),
         ]
           .filter(Boolean)
           .join(" ") || undefined;
