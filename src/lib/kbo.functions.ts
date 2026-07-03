@@ -113,7 +113,6 @@ function parseResponse(xml: string, enterpriseNumber: string): KboLookupResult {
     status,
     functions,
     source: "live",
-    raw: xml.slice(0, 1200),
   };
 }
 
@@ -136,6 +135,8 @@ function mockResult(enterpriseNumber: string, reason: string, requestXml?: strin
       { role: "Gedelegeerd bestuurder", firstName: "Sophie", lastName: "Van den Berg" },
     ],
     source: "mock",
+    endpoint: KBO_ENDPOINT,
+    requestXml: requestXml ? redact(requestXml) : undefined,
     error: reason,
   };
 }
