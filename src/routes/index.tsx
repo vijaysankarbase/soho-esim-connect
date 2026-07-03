@@ -1,290 +1,997 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import {
+  ArrowLeft,
   ArrowRight,
-  Building2,
+  Check,
   CheckCircle2,
-  Globe,
-  QrCode,
+  ChevronRight,
+  Loader2,
+  Package,
   ShieldCheck,
-  Sparkles,
-  Users,
-  Zap,
+  Signal,
+  Smartphone,
+  Truck,
+  X,
 } from "lucide-react";
-import { PageShell } from "@/components/site-shell";
-import { PLANS } from "@/lib/onboarding-store";
+import { useMemo, useState } from "react";
+import { lookupEnterprise, type KboLookupResult } from "@/lib/kbo.functions";
+import { matchIdentity } from "@/lib/name-match";
 
 export const Route = createFileRoute("/")({
-  component: Landing,
+  head: () => ({
+    meta: [
+      { title: "SOHO eSIM Onboarding POC · My BASE" },
+      {
+        name: "description",
+        content:
+          "Proof of concept for SOHO eSIM onboarding: eSIM compatibility, itsme identity, KBO company validation.",
+      },
+    ],
+  }),
+  component: SohoPoc,
 });
 
-function Landing() {
+/* --------------------------- Plans --------------------------- */
+
+type Plan = {
+  id: string;
+  name: string;
+  price: number;
+  data: string;
+  calls: string;
+  perks: string[];
+  badge?: string;
+};
+
+const PLANS: Plan[] = [
+  {
+    id: "soho-s",
+    name: "SOHO S",
+    price: 15,
+    data: "10 GB",
+    calls: "200 min",
+    perks: ["EU roaming", "5G", "Voicemail"],
+  },
+  {
+    id: "soho-m",
+    name: "SOHO M",
+    price: 25,
+    data: "50 GB",
+    calls: "Unlimited",
+    perks: ["EU + UK roaming", "5G", "Shared pool"],
+    badge: "Popular",
+  },
+  {
+    id: "soho-l",
+    name: "SOHO L",
+    price: 40,
+    data: "150 GB",
+    calls: "Unlimited",
+    perks: ["EU + UK + US", "5G+", "Priority network"],
+  },
+  {
+    id: "soho-xl",
+    name: "SOHO XL",
+    price: 60,
+    data: "Unlimited",
+    calls: "Unlimited",
+    perks: ["Global 60+ countries", "5G+", "24/7 support"],
+  },
+];
+
+/* ------------------------ Screen keys ------------------------ */
+
+type Screen =
+  | "plans"
+  | "sim-select"
+  | "esim-compatible"
+  | "customer-info"
+  | "company-info"
+  | "itsme-loading"
+  | "itsme-consent"
+  | "kbo-loading"
+  | "kbo-not-active"
+  | "match-fail"
+  | "match-success"
+  | "physical-order"
+  | "physical-confirmed";
+
+/* ============================================================ */
+
+function SohoPoc() {
+  // Dev/debug input panel state
+  const [esimCompatible, setEsimCompatible] = useState(true);
+  const [itsmeName, setItsmeName] = useState("Jan Peeters");
+  const [enterpriseNumber, setEnterpriseNumber] = useState("0203201340");
+
+  // Wizard state
+  const [screen, setScreen] = useState<Screen>("plans");
+  const [history, setHistory] = useState<Screen[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [simType, setSimType] = useState<"esim" | "physical" | null>(null);
+  const [customer, setCustomer] = useState({ name: "", email: "", dob: "" });
+  const [company, setCompany] = useState({ name: "", type: "BVBA" });
+  const [kbo, setKbo] = useState<KboLookupResult | null>(null);
+
+  const lookupFn = useServerFn(lookupEnterprise);
+
+  const go = (next: Screen) => {
+    setHistory((h) => [...h, screen]);
+    setScreen(next);
+  };
+  const back = () => {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      setScreen(prev);
+      return h.slice(0, -1);
+    });
+  };
+  const restart = () => {
+    setScreen("plans");
+    setHistory([]);
+    setSelectedPlanId(null);
+    setSimType(null);
+    setKbo(null);
+  };
+
+  const selectedPlan = useMemo(
+    () => PLANS.find((p) => p.id === selectedPlanId) ?? null,
+    [selectedPlanId],
+  );
+
+  /* --------------- Flow transitions --------------- */
+
+  const chooseSim = (t: "esim" | "physical") => {
+    setSimType(t);
+    if (t === "physical") {
+      go("physical-order");
+    } else {
+      go(esimCompatible ? "esim-compatible" : "match-fail");
+    }
+  };
+
+  const startItsme = () => {
+    go("itsme-loading");
+    setTimeout(() => setScreen("itsme-consent"), 1400);
+  };
+
+  const runKbo = async () => {
+    go("kbo-loading");
+    try {
+      const result = await lookupFn({ data: { enterpriseNumber } });
+      setKbo(result);
+      if (result.status !== "active") {
+        setScreen("kbo-not-active");
+        return;
+      }
+      const matched = result.functions.some((f) => matchIdentity(itsmeName, f));
+      setScreen(matched ? "match-success" : "match-fail");
+    } catch (e) {
+      setKbo({
+        enterpriseNumber,
+        companyName: "",
+        status: "unknown",
+        functions: [],
+        source: "mock",
+        error: e instanceof Error ? e.message : String(e),
+      });
+      setScreen("match-fail");
+    }
+  };
+
+  /* ==================== Render ==================== */
+
   return (
-    <PageShell>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-hero-gradient" aria-hidden />
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-6 py-20 md:grid-cols-[1.1fr_0.9fr] md:py-28">
-          <div className="flex flex-col justify-center">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5 text-accent" />
-              Small office · Home office · eSIM
-            </span>
-            <h1 className="mt-6 font-display text-5xl font-semibold leading-[1.05] tracking-tight text-balance md:text-6xl">
-              Give your whole team a mobile line{" "}
-              <span className="bg-gradient-to-r from-accent to-signal bg-clip-text text-transparent">
-                before lunch.
-              </span>
-            </h1>
-            <p className="mt-6 max-w-lg text-lg text-muted-foreground text-balance">
-              Nimbus eSIM SOHO onboards small businesses in under 10 minutes. Register
-              your company, pick a plan, invite your team — they activate with a QR code.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                to="/onboarding"
-                className="group inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground shadow-lift transition hover:opacity-90"
-              >
-                Start free onboarding
-                <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-              </Link>
-              <Link
-                to="/dashboard"
-                className="inline-flex h-12 items-center gap-2 rounded-full border border-border bg-card px-6 text-sm font-medium text-foreground transition hover:bg-secondary"
-              >
-                See the admin dashboard
-              </Link>
-            </div>
-            <dl className="mt-10 grid grid-cols-3 gap-6 border-t border-border/60 pt-8 text-sm">
-              {[
-                ["10 min", "avg. onboarding"],
-                ["60+", "countries roaming"],
-                ["0", "plastic SIM cards"],
-              ].map(([k, v]) => (
-                <div key={v}>
-                  <dt className="font-display text-2xl font-semibold">{k}</dt>
-                  <dd className="text-muted-foreground">{v}</dd>
-                </div>
-              ))}
-            </dl>
+    <div className="min-h-screen bg-gradient-to-br from-[#001a3d] via-[#002a5c] to-[#003a7d] py-8">
+      <div className="mx-auto max-w-xl px-4">
+        {/* Debug input panel — only on first screen */}
+        {screen === "plans" && (
+          <DebugPanel
+            esimCompatible={esimCompatible}
+            setEsimCompatible={setEsimCompatible}
+            itsmeName={itsmeName}
+            setItsmeName={setItsmeName}
+            enterpriseNumber={enterpriseNumber}
+            setEnterpriseNumber={setEnterpriseNumber}
+          />
+        )}
+
+        {/* Phone mockup */}
+        <PhoneFrame>
+          <PhoneChrome onBack={history.length ? back : undefined} onRestart={restart} />
+
+          <div className="flex-1 overflow-y-auto">
+            {screen === "plans" && (
+              <PlansScreen
+                selected={selectedPlanId}
+                onSelect={setSelectedPlanId}
+                onNext={() => go("sim-select")}
+              />
+            )}
+            {screen === "sim-select" && (
+              <SimSelectScreen esimCompatible={esimCompatible} onChoose={chooseSim} />
+            )}
+            {screen === "esim-compatible" && (
+              <EsimCompatibleScreen onNext={() => go("customer-info")} />
+            )}
+            {screen === "customer-info" && (
+              <CustomerInfoScreen
+                value={customer}
+                onChange={setCustomer}
+                onNext={() => go("company-info")}
+              />
+            )}
+            {screen === "company-info" && (
+              <CompanyInfoScreen
+                value={company}
+                onChange={setCompany}
+                enterpriseNumber={enterpriseNumber}
+                setEnterpriseNumber={setEnterpriseNumber}
+                onNext={startItsme}
+              />
+            )}
+            {screen === "itsme-loading" && <ItsmeLoading />}
+            {screen === "itsme-consent" && (
+              <ItsmeConsent name={itsmeName} onApprove={runKbo} onCancel={back} />
+            )}
+            {screen === "kbo-loading" && <KboLoading />}
+            {screen === "kbo-not-active" && <KboNotActive kbo={kbo!} onRestart={restart} />}
+            {screen === "match-fail" && (
+              <MatchFailScreen
+                itsmeName={itsmeName}
+                kbo={kbo}
+                onPhysical={() => {
+                  setSimType("physical");
+                  go("physical-order");
+                }}
+              />
+            )}
+            {screen === "match-success" && (
+              <MatchSuccessScreen
+                plan={selectedPlan}
+                kbo={kbo!}
+                itsmeName={itsmeName}
+                onFinish={restart}
+              />
+            )}
+            {screen === "physical-order" && (
+              <PhysicalOrderScreen
+                plan={selectedPlan}
+                onSubmit={() => go("physical-confirmed")}
+              />
+            )}
+            {screen === "physical-confirmed" && <PhysicalConfirmed onFinish={restart} />}
           </div>
+        </PhoneFrame>
 
-          {/* Hero device mock */}
-          <div className="relative flex items-center justify-center">
-            <div className="absolute -inset-6 rounded-3xl bg-gradient-to-br from-accent/20 via-transparent to-signal/20 blur-2xl" />
-            <div className="relative w-full max-w-sm rounded-3xl border border-border bg-card p-6 shadow-lift">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                    Nimbus eSIM
-                  </p>
-                  <p className="font-display text-lg font-semibold">Team plan · 50 GB</p>
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/20 px-2 py-1 text-xs font-medium text-success-foreground">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                  Active
-                </span>
-              </div>
-              <div className="mt-6 grid aspect-square place-items-center rounded-2xl bg-primary p-6 text-primary-foreground">
-                <QrCode className="h-40 w-40" strokeWidth={1.2} />
-              </div>
-              <div className="mt-5 flex items-center justify-between text-sm">
-                <div>
-                  <p className="text-muted-foreground">Line</p>
-                  <p className="font-medium">+49 151 ••• 4021</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-muted-foreground">Data used</p>
-                  <p className="font-medium">3.2 / 50 GB</p>
-                </div>
-              </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
-                <div className="h-full w-[6%] rounded-full bg-gradient-to-r from-accent to-signal" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+        {kbo && (kbo.requestXml || kbo.responseXml || kbo.error) && (
+          <KboDebug kbo={kbo} />
+        )}
 
-      {/* How it works */}
-      <section className="border-t border-border/60 bg-card">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="max-w-2xl">
-            <p className="text-sm font-medium uppercase tracking-widest text-accent">
-              How it works
-            </p>
-            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight">
-              From company signup to first call in four steps.
-            </h2>
-          </div>
-          <ol className="mt-14 grid gap-6 md:grid-cols-4">
-            {[
-              {
-                icon: Building2,
-                title: "Register the business",
-                desc: "Company name, tax ID and an admin contact. That's it.",
-              },
-              {
-                icon: Zap,
-                title: "Pick a plan",
-                desc: "Starter, Team or Unlimited — with EU or global roaming.",
-              },
-              {
-                icon: Users,
-                title: "Invite the team",
-                desc: "Add lines for each employee. They get an email in seconds.",
-              },
-              {
-                icon: QrCode,
-                title: "Scan & activate",
-                desc: "Employees scan a QR code on their phone. Line is live.",
-              },
-            ].map((s, i) => (
-              <li
-                key={s.title}
-                className="relative rounded-2xl border border-border bg-background p-6"
-              >
-                <span className="absolute -top-3 left-6 rounded-full bg-primary px-2.5 py-0.5 font-mono text-xs text-primary-foreground">
-                  0{i + 1}
-                </span>
-                <s.icon className="h-6 w-6 text-accent" />
-                <h3 className="mt-4 font-display text-lg font-semibold">{s.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{s.desc}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+        <p className="mt-6 text-center text-xs text-white/50">
+          POC · My BASE inspired flow · KBO ({kbo?.source ?? "not called"})
+        </p>
+      </div>
+    </div>
+  );
+}
 
-      {/* Plans */}
-      <section id="plans" className="border-t border-border/60">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-xl">
-              <p className="text-sm font-medium uppercase tracking-widest text-accent">
-                Plans
-              </p>
-              <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight">
-                Transparent per-line pricing.
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                All plans include EU roaming, 5G access, and a single invoice for the
-                whole company. Cancel or change any month.
-              </p>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Prices in EUR, VAT excluded.
-            </p>
-          </div>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {PLANS.map((p) => (
-              <div
-                key={p.id}
-                className={`relative flex flex-col rounded-2xl border p-7 transition ${
-                  p.highlight
-                    ? "border-primary bg-primary text-primary-foreground shadow-lift"
-                    : "border-border bg-card"
-                }`}
-              >
-                {p.highlight && (
-                  <span className="absolute -top-3 right-6 rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-accent-foreground">
-                    Most popular
-                  </span>
-                )}
-                <h3 className="font-display text-xl font-semibold">{p.name}</h3>
-                <p
-                  className={`text-sm ${
-                    p.highlight ? "text-primary-foreground/70" : "text-muted-foreground"
-                  }`}
-                >
-                  {p.data} of high-speed data
-                </p>
-                <div className="mt-6 flex items-baseline gap-1">
-                  <span className="font-display text-5xl font-semibold">€{p.price}</span>
-                  <span
-                    className={
-                      p.highlight ? "text-primary-foreground/70" : "text-muted-foreground"
-                    }
-                  >
-                    /line/mo
-                  </span>
-                </div>
-                <ul className="mt-6 space-y-2 text-sm">
-                  {p.perks.map((perk) => (
-                    <li key={perk} className="flex items-start gap-2">
-                      <CheckCircle2
-                        className={`mt-0.5 h-4 w-4 shrink-0 ${
-                          p.highlight ? "text-accent" : "text-accent"
-                        }`}
-                      />
-                      <span>{perk}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to="/onboarding"
-                  className={`mt-8 inline-flex h-11 items-center justify-center rounded-full text-sm font-medium transition ${
-                    p.highlight
-                      ? "bg-accent text-accent-foreground hover:opacity-90"
-                      : "border border-border bg-background hover:bg-secondary"
-                  }`}
-                >
-                  Choose {p.name}
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Trust */}
-      <section className="border-t border-border/60 bg-secondary/40">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-16 md:grid-cols-3">
-          {[
-            {
-              icon: ShieldCheck,
-              title: "GDPR-first",
-              desc: "EU-hosted infrastructure. KYB verified admins. Auditable line history.",
-            },
-            {
-              icon: Globe,
-              title: "Works in 60+ countries",
-              desc: "Automatic network selection across partner carriers, no reconfiguration.",
-            },
-            {
-              icon: Zap,
-              title: "Provision by API",
-              desc: "Bulk-invite lines from your HR tool via a single REST endpoint.",
-            },
-          ].map((f) => (
-            <div key={f.title} className="rounded-2xl border border-border bg-card p-6">
-              <f.icon className="h-6 w-6 text-accent" />
-              <h3 className="mt-4 font-display text-lg font-semibold">{f.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="border-t border-border/60">
-        <div className="mx-auto max-w-6xl px-6 py-20 text-center">
-          <h2 className="font-display text-4xl font-semibold tracking-tight text-balance">
-            Ready to onboard your office?
-          </h2>
-          <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
-            Try the full flow — register a business, pick a plan, invite lines, and see
-            QR activation. No credit card required.
-          </p>
-          <Link
-            to="/onboarding"
-            className="mt-8 inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground shadow-lift transition hover:opacity-90"
+function KboDebug({ kbo }: { kbo: KboLookupResult }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-6 rounded-2xl border border-white/15 bg-white/5 backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-cyan-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+          Last KBO round-trip
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] normal-case tracking-normal ${
+              kbo.source === "live" ? "bg-emerald-400/20 text-emerald-200" : "bg-amber-400/20 text-amber-200"
+            }`}
           >
-            Launch onboarding
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+            {kbo.source}
+          </span>
+        </span>
+        <span className="text-xs text-white/50">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-white/10 p-4 text-xs text-white/80">
+          {kbo.endpoint && (
+            <div>
+              <div className="mb-1 text-white/50">Endpoint</div>
+              <code className="block break-all rounded bg-black/40 p-2 font-mono text-[11px] text-cyan-200">
+                POST {kbo.endpoint}
+              </code>
+            </div>
+          )}
+          {kbo.error && (
+            <div>
+              <div className="mb-1 text-white/50">Note</div>
+              <div className="rounded bg-amber-500/10 p-2 text-[11px] text-amber-200">{kbo.error}</div>
+            </div>
+          )}
+          {kbo.requestXml && (
+            <details open>
+              <summary className="cursor-pointer text-white/60">Request SOAP envelope (password digest redacted)</summary>
+              <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-white/80">
+                {kbo.requestXml}
+              </pre>
+            </details>
+          )}
+          {kbo.responseXml && (
+            <details>
+              <summary className="cursor-pointer text-white/60">Response SOAP (truncated)</summary>
+              <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-white/80">
+                {kbo.responseXml}
+              </pre>
+            </details>
+          )}
         </div>
-      </section>
-    </PageShell>
+      )}
+    </div>
+  );
+}
+
+
+/* ==================== Building blocks ==================== */
+
+function DebugPanel(props: {
+  esimCompatible: boolean;
+  setEsimCompatible: (v: boolean) => void;
+  itsmeName: string;
+  setItsmeName: (v: string) => void;
+  enterpriseNumber: string;
+  setEnterpriseNumber: (v: string) => void;
+}) {
+  return (
+    <div className="mb-6 rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur">
+      <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-cyan-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" />
+        POC Inputs
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-sm text-white">
+          <span>eSIM compatible</span>
+          <button
+            type="button"
+            onClick={() => props.setEsimCompatible(!props.esimCompatible)}
+            className={`relative h-6 w-11 rounded-full transition ${
+              props.esimCompatible ? "bg-cyan-400" : "bg-white/20"
+            }`}
+            aria-label="Toggle eSIM compatibility"
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+                props.esimCompatible ? "left-5" : "left-0.5"
+              }`}
+            />
+          </button>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-white">
+          <span className="text-xs text-white/60">itsme name</span>
+          <input
+            className="h-9 rounded-lg bg-white/10 px-3 text-sm text-white outline-none placeholder:text-white/40 focus:bg-white/15"
+            value={props.itsmeName}
+            onChange={(e) => props.setItsmeName(e.target.value)}
+            placeholder="Jan Peeters"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-white">
+          <span className="text-xs text-white/60">Enterprise nr.</span>
+          <input
+            className="h-9 rounded-lg bg-white/10 px-3 font-mono text-sm text-white outline-none placeholder:text-white/40 focus:bg-white/15"
+            value={props.enterpriseNumber}
+            onChange={(e) => props.setEnterpriseNumber(e.target.value)}
+            placeholder="0203.201.340"
+          />
+        </label>
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-white/50">
+        Tip: end enterprise nr. with <span className="font-mono">0000</span> to force an inactive
+        company. Set itsme name to <span className="font-mono">Jan Peeters</span>,{" "}
+        <span className="font-mono">Marie Dubois</span> or{" "}
+        <span className="font-mono">Sophie Van den Berg</span> to match the mock KBO functions.
+      </p>
+    </div>
+  );
+}
+
+function PhoneFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-[380px]">
+      <div className="relative rounded-[2.5rem] border-[10px] border-black bg-black shadow-2xl">
+        <div className="absolute left-1/2 top-2 z-10 h-6 w-32 -translate-x-1/2 rounded-full bg-black" />
+        <div className="flex h-[720px] flex-col overflow-hidden rounded-[2rem] bg-white">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PhoneChrome({ onBack, onRestart }: { onBack?: () => void; onRestart: () => void }) {
+  return (
+    <>
+      <div className="flex items-center justify-between bg-white px-6 pb-1 pt-3 text-xs font-medium text-black">
+        <span>9:41</span>
+        <div className="flex items-center gap-1">
+          <Signal className="h-3 w-3" />
+          <span className="text-[10px]">BASE</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={!onBack}
+          className="grid h-9 w-9 place-items-center rounded-full text-slate-700 hover:bg-slate-100 disabled:opacity-30"
+          aria-label="Back"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-1.5">
+          <div className="h-2 w-2 rounded-full bg-[#00b4d8]" />
+          <span className="font-display text-sm font-semibold text-slate-800">My BASE</span>
+        </div>
+        <button
+          type="button"
+          onClick={onRestart}
+          className="rounded-full px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100"
+        >
+          Restart
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* ==================== Screens ==================== */
+
+function PlansScreen({
+  selected,
+  onSelect,
+  onNext,
+}: {
+  selected: string | null;
+  onSelect: (id: string) => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="px-5 pb-3 pt-5">
+        <h1 className="font-display text-2xl font-semibold text-slate-900">Choose your SOHO plan</h1>
+        <p className="mt-1 text-sm text-slate-500">For freelancers and small offices.</p>
+      </div>
+      <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-4">
+        {PLANS.map((p) => {
+          const active = selected === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onSelect(p.id)}
+              className={`relative w-full rounded-2xl border-2 p-4 text-left transition ${
+                active
+                  ? "border-[#00b4d8] bg-cyan-50/60"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              {p.badge && (
+                <span className="absolute -top-2 right-4 rounded-full bg-[#00b4d8] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
+                  {p.badge}
+                </span>
+              )}
+              <div className="flex items-baseline justify-between">
+                <span className="font-display text-lg font-semibold text-slate-900">{p.name}</span>
+                <span className="text-slate-900">
+                  <span className="text-xl font-bold">€{p.price}</span>
+                  <span className="text-xs text-slate-500">/mo</span>
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                <span>📶 {p.data}</span>
+                <span>📞 {p.calls}</span>
+              </div>
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {p.perks.map((perk) => (
+                  <li
+                    key={perk}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
+                  >
+                    {perk}
+                  </li>
+                ))}
+              </ul>
+            </button>
+          );
+        })}
+      </div>
+      <div className="border-t border-slate-100 bg-white px-5 py-4">
+        <PrimaryButton disabled={!selected} onClick={onNext}>
+          Continue
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function SimSelectScreen({
+  esimCompatible,
+  onChoose,
+}: {
+  esimCompatible: boolean;
+  onChoose: (t: "esim" | "physical") => void;
+}) {
+  return (
+    <div className="flex h-full flex-col px-5 py-5">
+      <h1 className="font-display text-2xl font-semibold text-slate-900">Choose your SIM</h1>
+      <p className="mt-1 text-sm text-slate-500">How do you want to activate your line?</p>
+      <div className="mt-6 space-y-3">
+        <button
+          type="button"
+          onClick={() => onChoose("esim")}
+          className="flex w-full items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-4 text-left transition hover:border-[#00b4d8]"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-cyan-50 text-[#00b4d8]">
+            <Smartphone className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <div className="font-semibold text-slate-900">eSIM</div>
+            <div className="text-xs text-slate-500">Activate instantly, no card to receive.</div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onChoose("physical")}
+          className="flex w-full items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-4 text-left transition hover:border-[#00b4d8]"
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-slate-100 text-slate-700">
+            <Package className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <div className="font-semibold text-slate-900">Physical SIM</div>
+            <div className="text-xs text-slate-500">Shipped to your address in 1–2 days.</div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400" />
+        </button>
+      </div>
+      {!esimCompatible && (
+        <div className="mt-6 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+          Heads up: your device does not appear to be eSIM-ready. We'll check this after you pick.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EsimCompatibleScreen({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between px-6 py-8 text-center">
+      <div />
+      <div className="flex flex-col items-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-cyan-50">
+          <CheckCircle2 className="h-14 w-14 text-[#00b4d8]" strokeWidth={1.5} />
+        </div>
+        <h1 className="mt-6 font-display text-2xl font-semibold text-slate-900">
+          Your phone is eSIM compatible
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          We can activate your BASE SOHO line straight to this device. Next, we'll verify your
+          identity and your company.
+        </p>
+      </div>
+      <div className="w-full">
+        <PrimaryButton onClick={onNext}>Continue</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function CustomerInfoScreen({
+  value,
+  onChange,
+  onNext,
+}: {
+  value: { name: string; email: string; dob: string };
+  onChange: (v: { name: string; email: string; dob: string }) => void;
+  onNext: () => void;
+}) {
+  const canNext = value.name && value.email && value.dob;
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1 space-y-4 px-5 py-5">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-slate-900">About you</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            We need a few details to prepare your line.
+          </p>
+        </div>
+        <MobileField label="Full name">
+          <input
+            className={mInput}
+            placeholder="Jan Peeters"
+            value={value.name}
+            onChange={(e) => onChange({ ...value, name: e.target.value })}
+          />
+        </MobileField>
+        <MobileField label="Email">
+          <input
+            type="email"
+            className={mInput}
+            placeholder="jan@example.be"
+            value={value.email}
+            onChange={(e) => onChange({ ...value, email: e.target.value })}
+          />
+        </MobileField>
+        <MobileField label="Date of birth">
+          <input
+            type="date"
+            className={mInput}
+            value={value.dob}
+            onChange={(e) => onChange({ ...value, dob: e.target.value })}
+          />
+        </MobileField>
+      </div>
+      <div className="border-t border-slate-100 bg-white px-5 py-4">
+        <PrimaryButton disabled={!canNext} onClick={onNext}>
+          Continue
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function CompanyInfoScreen({
+  value,
+  onChange,
+  enterpriseNumber,
+  setEnterpriseNumber,
+  onNext,
+}: {
+  value: { name: string; type: string };
+  onChange: (v: { name: string; type: string }) => void;
+  enterpriseNumber: string;
+  setEnterpriseNumber: (v: string) => void;
+  onNext: () => void;
+}) {
+  const canNext = value.name && enterpriseNumber.replace(/\D/g, "").length >= 9;
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1 space-y-4 px-5 py-5">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-slate-900">Your company</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            We verify this against the KBO / BCE registry.
+          </p>
+        </div>
+        <MobileField label="Company name">
+          <input
+            className={mInput}
+            placeholder="Nimbus Coffee BVBA"
+            value={value.name}
+            onChange={(e) => onChange({ ...value, name: e.target.value })}
+          />
+        </MobileField>
+        <MobileField label="Company number (KBO/BCE)">
+          <input
+            className={`${mInput} font-mono`}
+            placeholder="0203.201.340"
+            value={enterpriseNumber}
+            onChange={(e) => setEnterpriseNumber(e.target.value)}
+          />
+        </MobileField>
+        <MobileField label="Business type">
+          <select
+            className={mInput}
+            value={value.type}
+            onChange={(e) => onChange({ ...value, type: e.target.value })}
+          >
+            <option>BVBA</option>
+            <option>NV</option>
+            <option>Sole proprietorship</option>
+            <option>VZW</option>
+          </select>
+        </MobileField>
+      </div>
+      <div className="border-t border-slate-100 bg-white px-5 py-4">
+        <PrimaryButton disabled={!canNext} onClick={onNext}>
+          Continue with itsme
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function ItsmeLoading() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#ff5a00] text-white">
+      <div className="rounded-2xl bg-white/15 px-4 py-2 font-display text-lg font-bold">itsme®</div>
+      <Loader2 className="h-8 w-8 animate-spin" />
+      <p className="text-sm text-white/80">Opening itsme...</p>
+    </div>
+  );
+}
+
+function ItsmeConsent({
+  name,
+  onApprove,
+  onCancel,
+}: {
+  name: string;
+  onApprove: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col bg-[#ff5a00] text-white">
+      <div className="px-6 pt-8">
+        <div className="inline-block rounded-xl bg-white/15 px-3 py-1 font-display text-base font-bold">
+          itsme®
+        </div>
+        <h1 className="mt-6 font-display text-2xl font-semibold">Share your identity with BASE?</h1>
+        <p className="mt-2 text-sm text-white/80">
+          BASE is asking you to confirm your identity to open a SOHO eSIM line.
+        </p>
+        <div className="mt-6 space-y-2 rounded-2xl bg-white/10 p-4 text-sm">
+          <Row k="Name" v={name} />
+          <Row k="Nationality" v="Belgian" />
+          <Row k="Age verification" v="18+" />
+        </div>
+      </div>
+      <div className="mt-auto flex flex-col gap-2 p-5">
+        <button
+          type="button"
+          onClick={onApprove}
+          className="h-12 rounded-full bg-white font-semibold text-[#ff5a00]"
+        >
+          Confirm
+        </button>
+        <button type="button" onClick={onCancel} className="h-11 text-sm text-white/80">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-white/70">{k}</span>
+      <span className="font-medium">{v}</span>
+    </div>
+  );
+}
+
+function KboLoading() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4">
+      <div className="grid h-16 w-16 place-items-center rounded-full bg-cyan-50">
+        <ShieldCheck className="h-8 w-8 text-[#00b4d8]" />
+      </div>
+      <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      <p className="text-sm text-slate-600">Verifying company with KBO / BCE…</p>
+    </div>
+  );
+}
+
+function KboNotActive({ kbo, onRestart }: { kbo: KboLookupResult; onRestart: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between px-6 py-8 text-center">
+      <div />
+      <div className="flex flex-col items-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-red-50">
+          <X className="h-14 w-14 text-red-500" strokeWidth={1.5} />
+        </div>
+        <h1 className="mt-6 font-display text-2xl font-semibold text-slate-900">
+          Company is not active
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          According to KBO, <span className="font-medium">{kbo.companyName || kbo.enterpriseNumber}</span>{" "}
+          is not in an active state. We can't open a SOHO line for it.
+        </p>
+      </div>
+      <div className="w-full">
+        <PrimaryButton onClick={onRestart}>Back to start</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function MatchFailScreen({
+  itsmeName,
+  kbo,
+  onPhysical,
+}: {
+  itsmeName: string;
+  kbo: KboLookupResult | null;
+  onPhysical: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between px-6 py-8 text-center">
+      <div />
+      <div className="flex flex-col items-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-red-50">
+          <X className="h-14 w-14 text-red-500" strokeWidth={1.5} />
+        </div>
+        <h1 className="mt-6 font-display text-2xl font-semibold text-slate-900">
+          eSIM order is not possible
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          We couldn't match <span className="font-medium">{itsmeName}</span> to an authorised
+          representative of{" "}
+          <span className="font-medium">{kbo?.companyName || "this company"}</span>.
+        </p>
+        {kbo && kbo.functions.length > 0 && (
+          <div className="mt-4 w-full rounded-xl bg-slate-50 p-3 text-left text-xs text-slate-600">
+            <div className="mb-1 font-medium text-slate-700">KBO registered persons</div>
+            {kbo.functions.slice(0, 4).map((f, i) => (
+              <div key={i}>
+                • {f.firstName} {f.lastName} — {f.role}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="w-full space-y-2">
+        <PrimaryButton onClick={onPhysical}>Order a physical SIM instead</PrimaryButton>
+        <p className="text-xs text-slate-500">
+          A physical SIM is shipped to your company address for verification.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MatchSuccessScreen({
+  plan,
+  kbo,
+  itsmeName,
+  onFinish,
+}: {
+  plan: Plan | null;
+  kbo: KboLookupResult;
+  itsmeName: string;
+  onFinish: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col px-6 py-8">
+      <div className="flex flex-col items-center text-center">
+        <div className="grid h-20 w-20 place-items-center rounded-full bg-green-50">
+          <Check className="h-12 w-12 text-green-600" strokeWidth={2} />
+        </div>
+        <h1 className="mt-5 font-display text-2xl font-semibold text-slate-900">
+          Identity verified
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          {itsmeName} is a registered representative of {kbo.companyName}.
+        </p>
+      </div>
+      <div className="mt-6 space-y-3 rounded-2xl bg-slate-50 p-4 text-sm">
+        <Row2 k="Company" v={kbo.companyName} />
+        <Row2 k="KBO nr." v={kbo.enterpriseNumber} />
+        <Row2 k="Status" v="Active" />
+        {plan && <Row2 k="Plan" v={`${plan.name} — €${plan.price}/mo`} />}
+        <Row2 k="Data source" v={kbo.source === "live" ? "KBO live" : "KBO mock (fallback)"} />
+      </div>
+      <div className="mt-auto">
+        <PrimaryButton onClick={onFinish}>Activate my eSIM</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function Row2({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-slate-500">{k}</span>
+      <span className="text-right font-medium text-slate-900">{v}</span>
+    </div>
+  );
+}
+
+function PhysicalOrderScreen({ plan, onSubmit }: { plan: Plan | null; onSubmit: () => void }) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-slate-900">Order overview</h1>
+          <p className="mt-1 text-sm text-slate-500">Review your physical SIM order.</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-700">
+              <Package className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold text-slate-900">{plan?.name ?? "SOHO plan"}</div>
+              <div className="text-xs text-slate-500">
+                {plan?.data} · {plan?.calls}
+              </div>
+            </div>
+            <div className="font-semibold text-slate-900">€{plan?.price ?? 0}/mo</div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 p-4">
+          <div className="text-xs font-medium uppercase tracking-wider text-slate-500">
+            Shipping
+          </div>
+          <div className="mt-1 text-sm text-slate-900">Physical SIM · 1–2 working days</div>
+          <div className="text-xs text-slate-500">Free delivery to your business address</div>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-600">
+          By submitting you agree to BASE's SOHO terms. Your line will be activated once you insert
+          and register the SIM.
+        </div>
+      </div>
+      <div className="border-t border-slate-100 bg-white px-5 py-4">
+        <PrimaryButton onClick={onSubmit}>Submit order</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function PhysicalConfirmed({ onFinish }: { onFinish: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between px-6 py-8 text-center">
+      <div />
+      <div className="flex flex-col items-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-cyan-50">
+          <Truck className="h-14 w-14 text-[#00b4d8]" strokeWidth={1.5} />
+        </div>
+        <h1 className="mt-6 font-display text-2xl font-semibold text-slate-900">
+          Your SIM is on its way
+        </h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Your SIM will be shipped in <span className="font-medium">1–2 working days</span>. You'll
+          receive a tracking link by email.
+        </p>
+      </div>
+      <div className="w-full">
+        <PrimaryButton onClick={onFinish}>Done</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== UI atoms ==================== */
+
+const mInput =
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#00b4d8]";
+
+function MobileField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-slate-600">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function PrimaryButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#00b4d8] font-semibold text-white shadow-md transition hover:bg-[#0090b0] disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+      <ArrowRight className="h-4 w-4" />
+    </button>
   );
 }

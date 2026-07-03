@@ -77,17 +77,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Nimbus eSIM — Onboard your small office in minutes" },
+      { title: "SOHO eSIM Onboarding POC · My BASE" },
       {
         name: "description",
         content:
-          "Nimbus eSIM SOHO: activate business mobile lines for your whole team with a QR code. No stores, no SIM cards, no waiting.",
+          "Proof of concept for SOHO eSIM onboarding: eSIM compatibility, itsme identity, and KBO company validation.",
       },
-      { property: "og:title", content: "Nimbus eSIM — SOHO Onboarding" },
+      { property: "og:title", content: "SOHO eSIM Onboarding POC · My BASE" },
       {
         property: "og:description",
         content:
-          "Provision, activate and manage eSIM lines for your small office in minutes.",
+          "Mobile onboarding flow POC combining itsme identity with KBO/BCE company validation.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
