@@ -114,7 +114,9 @@ type Screen =
 function SohoPoc() {
   // Dev/debug input panel state
   const [esimCompatible, setEsimCompatible] = useState(true);
-  const [itsmeName, setItsmeName] = useState("Jan Peeters");
+  const [itsmeFirstName, setItsmeFirstName] = useState("Jan");
+  const [itsmeLastName, setItsmeLastName] = useState("Peeters");
+  const itsmeName = `${itsmeFirstName} ${itsmeLastName}`.replace(/\s+/g, " ").trim();
   const [enterpriseNumber, setEnterpriseNumber] = useState("0203201340");
 
   // Wizard state
@@ -207,9 +209,12 @@ function SohoPoc() {
           <DebugPanel
             esimCompatible={esimCompatible}
             setEsimCompatible={setEsimCompatible}
-            itsmeName={itsmeName}
-            setItsmeName={setItsmeName}
+            itsmeFirstName={itsmeFirstName}
+            setItsmeFirstName={setItsmeFirstName}
+            itsmeLastName={itsmeLastName}
+            setItsmeLastName={setItsmeLastName}
           />
+
         )}
 
         {/* Phone mockup */}
@@ -257,7 +262,12 @@ function SohoPoc() {
             )}
             {screen === "itsme-loading" && <ItsmeLoading />}
             {screen === "itsme-consent" && (
-              <ItsmeConsent name={itsmeName} onApprove={runKbo} onCancel={back} />
+              <ItsmeConsent
+                firstName={itsmeFirstName}
+                lastName={itsmeLastName}
+                onApprove={runKbo}
+                onCancel={back}
+              />
             )}
             {screen === "kbo-loading" && <KboLoading />}
             {screen === "kbo-error" && <KboErrorScreen kbo={kbo!} onRestart={restart} />}
@@ -381,8 +391,10 @@ function KboDebug({ kbo }: { kbo: KboLookupResult }) {
 function DebugPanel(props: {
   esimCompatible: boolean;
   setEsimCompatible: (v: boolean) => void;
-  itsmeName: string;
-  setItsmeName: (v: string) => void;
+  itsmeFirstName: string;
+  setItsmeFirstName: (v: string) => void;
+  itsmeLastName: string;
+  setItsmeLastName: (v: string) => void;
 }) {
   return (
     <div className="mb-6 rounded-2xl border border-white/15 bg-white/5 p-4 backdrop-blur">
@@ -391,7 +403,7 @@ function DebugPanel(props: {
         POC Inputs
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-sm text-white">
+        <label className="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-3 py-2 text-sm text-white sm:col-span-2">
           <span>eSIM compatible</span>
           <button
             type="button"
@@ -409,18 +421,27 @@ function DebugPanel(props: {
           </button>
         </label>
         <label className="flex flex-col gap-1 text-sm text-white">
-          <span className="text-xs text-white/60">itsme name</span>
+          <span className="text-xs text-white/60">itsme first name</span>
           <input
             className="h-9 rounded-lg bg-white/10 px-3 text-sm text-white outline-none placeholder:text-white/40 focus:bg-white/15"
-            value={props.itsmeName}
-            onChange={(e) => props.setItsmeName(e.target.value)}
-            placeholder="Jan Peeters"
+            value={props.itsmeFirstName}
+            onChange={(e) => props.setItsmeFirstName(e.target.value)}
+            placeholder="Jan"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-white">
+          <span className="text-xs text-white/60">itsme last name</span>
+          <input
+            className="h-9 rounded-lg bg-white/10 px-3 text-sm text-white outline-none placeholder:text-white/40 focus:bg-white/15"
+            value={props.itsmeLastName}
+            onChange={(e) => props.setItsmeLastName(e.target.value)}
+            placeholder="Peeters"
           />
         </label>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-white/50">
         Live KBO Public Search WS (acceptance). The enterprise number is entered in the phone flow.
-        The itsme name is compared against the company's authorised representatives returned by KBO.
+        First and last name are compared separately against the company's authorised representatives returned by KBO.
       </p>
     </div>
   );
@@ -775,11 +796,13 @@ function ItsmeLoading() {
 }
 
 function ItsmeConsent({
-  name,
+  firstName,
+  lastName,
   onApprove,
   onCancel,
 }: {
-  name: string;
+  firstName: string;
+  lastName: string;
   onApprove: () => void;
   onCancel: () => void;
 }) {
@@ -794,7 +817,8 @@ function ItsmeConsent({
           BASE is asking you to confirm your identity to open a SOHO eSIM line.
         </p>
         <div className="mt-6 space-y-2 rounded-2xl bg-white/10 p-4 text-sm">
-          <Row k="Name" v={name} />
+          <Row k="First name" v={firstName || "—"} />
+          <Row k="Last name" v={lastName || "—"} />
           <Row k="Nationality" v="Belgian" />
           <Row k="Age verification" v="18+" />
         </div>
