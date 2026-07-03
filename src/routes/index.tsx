@@ -219,7 +219,16 @@ function SohoPoc() {
               <SimSelectScreen esimCompatible={esimCompatible} onChoose={chooseSim} />
             )}
             {screen === "esim-compatible" && (
-              <EsimCompatibleScreen onNext={() => go("customer-info")} />
+              <EsimCompatibleScreen
+                onSelectEsim={() => {
+                  setSimType("esim");
+                  go("customer-info");
+                }}
+                onSelectPhysical={() => {
+                  setSimType("physical");
+                  go("physical-order");
+                }}
+              />
             )}
             {screen === "customer-info" && (
               <CustomerInfoScreen
