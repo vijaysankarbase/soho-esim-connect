@@ -114,7 +114,9 @@ type Screen =
 function SohoPoc() {
   // Dev/debug input panel state
   const [esimCompatible, setEsimCompatible] = useState(true);
-  const [itsmeName, setItsmeName] = useState("Jan Peeters");
+  const [itsmeFirstName, setItsmeFirstName] = useState("Jan");
+  const [itsmeLastName, setItsmeLastName] = useState("Peeters");
+  const itsmeName = `${itsmeFirstName} ${itsmeLastName}`.replace(/\s+/g, " ").trim();
   const [enterpriseNumber, setEnterpriseNumber] = useState("0203201340");
 
   // Wizard state
