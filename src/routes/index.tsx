@@ -584,7 +584,6 @@ function EsimCompatibleScreen({
     { icon: Zap, text: "Instant activation — no waiting for delivery" },
     { icon: Globe, text: "Switch plans or add lines digitally" },
     { icon: Smartphone, text: "Use multiple numbers on one device" },
-    { icon: ShieldCheck, text: "Secure profile stored directly on your phone" },
   ];
 
   return (
@@ -601,13 +600,13 @@ function EsimCompatibleScreen({
             You're all set for a digital SIM. Activate your SOHO line in minutes.
           </p>
         </div>
-        <div className="mt-4 space-y-2">
+        <div className="mt-5 space-y-2">
           {benefits.map((b) => {
             const Icon = b.icon;
             return (
               <div
                 key={b.text}
-                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-2.5"
+                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3"
               >
                 <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-50 text-[#00b4d8]">
                   <Icon className="h-5 w-5" />
