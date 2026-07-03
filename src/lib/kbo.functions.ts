@@ -117,10 +117,14 @@ function parseResponse(xml: string, enterpriseNumber: string): KboLookupResult {
   };
 }
 
-function mockResult(enterpriseNumber: string, reason: string): KboLookupResult {
-  // Deterministic mock keyed off the enterprise number for demo predictability.
+function parseResponseWithMeta(xml: string, enterpriseNumber: string, requestXml: string): KboLookupResult {
+  const base = parseResponse(xml, enterpriseNumber);
+  return { ...base, endpoint: KBO_ENDPOINT, requestXml: redact(requestXml), responseXml: xml.slice(0, 4000) };
+}
+
+function mockResult(enterpriseNumber: string, reason: string, requestXml?: string): KboLookupResult {
   const clean = normalizeEnterprise(enterpriseNumber);
-  const inactive = clean.endsWith("0000"); // easy way to test the "not active" branch
+  const inactive = clean.endsWith("0000");
   return {
     enterpriseNumber: clean,
     companyName: "NIMBUS COFFEE BVBA",
