@@ -1090,7 +1090,8 @@ function SecondaryButton({
 /* ==================== eSIM install simulation ==================== */
 
 function EsimPinScreen({ onActivate }: { onActivate: () => void }) {
-  const pin = "4829-7361-BASE-EU";
+  const pin = "4829";
+
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
