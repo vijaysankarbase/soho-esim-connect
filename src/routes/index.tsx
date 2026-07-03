@@ -878,7 +878,7 @@ function MatchSuccessScreen({
         <Row2 k="KBO nr." v={kbo.enterpriseNumber} />
         <Row2 k="Status" v="Active" />
         {plan && <Row2 k="Plan" v={`${plan.name} — €${plan.price}/mo`} />}
-        <Row2 k="Data source" v={kbo.source === "live" ? "KBO live" : "KBO mock (fallback)"} />
+        <Row2 k="Data source" v={kbo.source === "live" ? "KBO live" : "KBO error"} />
       </div>
       <div className="mt-auto">
         <PrimaryButton onClick={onFinish}>Activate my eSIM</PrimaryButton>
