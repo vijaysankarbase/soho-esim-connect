@@ -1055,16 +1055,24 @@ const mInput =
   "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#00b4d8]";
 
 function DobInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  // value is ISO YYYY-MM-DD (or empty)
-  const [y, m, d] = value ? value.split("-") : ["", "", ""];
-  const emit = (dd: string, mm: string, yyyy: string) => {
-    if (dd.length === 2 && mm.length === 2 && yyyy.length === 4) {
-      onChange(`${yyyy}-${mm}-${dd}`);
-    } else {
+  // value is ISO YYYY-MM-DD (or empty). Keep local partial state so users can type freely.
+  const initial = React.useMemo(() => {
+    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [yy, mm, dd] = value.split("-");
+      return { d: dd, m: mm, y: yy };
+    }
+    return { d: "", m: "", y: "" };
+  }, [value]);
+  const [parts, setParts] = React.useState(initial);
+  const numeric = (s: string, max: number) => s.replace(/\D/g, "").slice(0, max);
+  const update = (next: { d: string; m: string; y: string }) => {
+    setParts(next);
+    if (next.d.length === 2 && next.m.length === 2 && next.y.length === 4) {
+      onChange(`${next.y}-${next.m}-${next.d}`);
+    } else if (value) {
       onChange("");
     }
   };
-  const numeric = (s: string, max: number) => s.replace(/\D/g, "").slice(0, max);
   return (
     <div className="flex gap-2">
       <input
@@ -1072,27 +1080,27 @@ function DobInput({ value, onChange }: { value: string; onChange: (v: string) =>
         placeholder="DD"
         aria-label="Day"
         className={`${mInput} text-center`}
-        value={d ?? ""}
+        value={parts.d}
         maxLength={2}
-        onChange={(e) => emit(numeric(e.target.value, 2), m ?? "", y ?? "")}
+        onChange={(e) => update({ ...parts, d: numeric(e.target.value, 2) })}
       />
       <input
         inputMode="numeric"
         placeholder="MM"
         aria-label="Month"
         className={`${mInput} text-center`}
-        value={m ?? ""}
+        value={parts.m}
         maxLength={2}
-        onChange={(e) => emit(d ?? "", numeric(e.target.value, 2), y ?? "")}
+        onChange={(e) => update({ ...parts, m: numeric(e.target.value, 2) })}
       />
       <input
         inputMode="numeric"
         placeholder="YYYY"
         aria-label="Year"
         className={`${mInput} text-center`}
-        value={y ?? ""}
+        value={parts.y}
         maxLength={4}
-        onChange={(e) => emit(d ?? "", m ?? "", numeric(e.target.value, 4))}
+        onChange={(e) => update({ ...parts, y: numeric(e.target.value, 4) })}
       />
     </div>
   );
